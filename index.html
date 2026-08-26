@@ -6,33 +6,35 @@
   <title>台股即時強弱看板</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background-color: #0f1117; color: #f0f3f6; padding: 12px 12px 60px 12px; }
+    body { background-color: #121212; color: #e0e0e0; padding: 16px; }
     
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #21262d; }
-    .header h1 { font-size: 18px; font-weight: 700; color: #ffffff; }
-    .status-box { display: flex; align-items: center; gap: 8px; }
-    .status { font-size: 11px; color: #8b949e; }
-    .refresh-btn { background: #1f6feb; color: #ffffff; border: none; padding: 5px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .header h1 { font-size: 20px; font-weight: bold; color: #ffffff; margin: 0; }
+    .status-box { display: flex; align-items: center; gap: 10px; }
+    .status { font-size: 12px; color: #888; }
+    .refresh-btn { background: #387ed1; color: #ffffff; border: none; padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; }
     .refresh-btn:active { opacity: 0.8; }
 
-    .sector-bar { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 10px; -webkit-overflow-scrolling: touch; }
+    /* 寬敞的類股標籤 */
+    .sector-bar { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 16px; -webkit-overflow-scrolling: touch; }
     .sector-bar::-webkit-scrollbar { display: none; }
-    .tab-btn { background: #161b22; color: #8b949e; border: 1px solid #30363d; padding: 5px 12px; border-radius: 14px; font-size: 12px; white-space: nowrap; cursor: pointer; }
-    .tab-btn.active { background: #387ed1; color: #ffffff; border-color: #387ed1; font-weight: 600; }
+    .tab-btn { background: #222; color: #aaa; border: 1px solid #333; padding: 8px 16px; border-radius: 16px; font-size: 14px; white-space: nowrap; cursor: pointer; }
+    .tab-btn.active { background: #387ed1; color: #ffffff; border-color: #387ed1; font-weight: bold; }
 
-    .summary-bar { font-size: 11px; color: #8b949e; margin-bottom: 10px; display: flex; justify-content: space-between; padding: 0 2px; }
+    .summary-bar { font-size: 13px; color: #888; margin-bottom: 12px; display: flex; justify-content: space-between; }
 
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(105px, 1fr)); gap: 8px; }
-    .card { background: #161b22; border-radius: 8px; padding: 8px 10px; border: 1px solid #21262d; display: flex; flex-direction: column; justify-content: space-between; min-height: 72px; }
-    .card-top { display: flex; justify-content: space-between; align-items: baseline; }
-    .name { font-size: 13px; font-weight: 600; color: #f0f3f6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60px; }
-    .symbol { font-size: 10px; color: #8b949e; }
-    .price { font-size: 16px; font-weight: 700; margin: 2px 0; }
-    .change { font-size: 11px; font-weight: 600; }
+    /* 復原的寬敞手機網格排版 */
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+    .card { background: #1e1e1e; border-radius: 8px; padding: 12px; border: 1px solid #2a2a2a; display: flex; flex-direction: column; justify-content: space-between; }
+    .card-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+    .name { font-size: 15px; font-weight: bold; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80px; }
+    .symbol { font-size: 12px; color: #888; }
+    .price { font-size: 20px; font-weight: bold; margin-bottom: 4px; }
+    .change { font-size: 13px; font-weight: 500; }
     
-    .up { color: #f85149; }
-    .down { color: #3fb950; }
-    .equal { color: #8b949e; }
+    .up { color: #f23645; }
+    .down { color: #089981; }
+    .equal { color: #888; }
     .pulse { animation: pulse 1s infinite; }
     @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
   </style>
@@ -43,7 +45,7 @@
     <h1>📈 即時戰報</h1>
     <div class="status-box">
       <span id="last-update" class="status">載入名單中...</span>
-      <button class="refresh-btn" onclick="fetchLiveQuotes()">⚡ 現場刷新</button>
+      <button class="refresh-btn" onclick="fetchLiveQuotes()">刷新</button>
     </div>
   </div>
 
@@ -78,9 +80,8 @@
 
         allStocksList = data.stocks;
         renderSectors(allStocksList);
-        renderCards(); // 先繪製骨架卡片
+        renderCards(); 
 
-        // 現場抓取即時價格
         await fetchLiveQuotes();
       } catch (e) {
         document.getElementById('last-update').innerText = "名單載入失敗";
@@ -114,12 +115,11 @@
 
     async function fetchLiveQuotes() {
       const statusEl = document.getElementById('last-update');
-      statusEl.innerText = "⚡ 正在現場抓價...";
+      statusEl.innerText = "⚡ 現場抓價中...";
       
       const codes = Object.keys(allStocksList);
       if (codes.length === 0) return;
 
-      // 20 檔一包
       const chunks = [];
       for (let i = 0; i < codes.length; i += 20) {
         const chunkCodes = codes.slice(i, i + 20);
@@ -128,10 +128,10 @@
       }
 
       try {
-        // 使用公開的 allorigins CORS 代理，讓 HTML 瀏覽器可以直接抓證交所！
+        // 改用更強的 corsproxy 代理伺服器繞過封鎖
         const promises = chunks.map(chunk => {
           const twseUrl = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=${chunk}&json=1&delay=0`;
-          const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(twseUrl)}`;
+          const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(twseUrl)}`;
           
           return fetch(proxyUrl)
             .then(r => r.json())
@@ -156,7 +156,7 @@
         const now = new Date();
         statusEl.innerText = `🕒 ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}`;
       } catch (e) {
-        statusEl.innerText = "現場抓取異常";
+        statusEl.innerText = "抓取異常";
       }
 
       renderCards();
@@ -171,7 +171,6 @@
         targetCodes = targetCodes.filter(code => (allStocksList[code].sectors || []).includes(currentSector));
       }
 
-      // 依當前最新漲跌幅由大到小排序
       targetCodes.sort((a, b) => {
         const qA = latestQuotes[a];
         const qB = latestQuotes[b];
@@ -219,7 +218,7 @@
               <span class="symbol">${code}</span>
             </div>
             <div class="price equal pulse">--</div>
-            <div class="change equal">抓價中</div>
+            <div class="change equal">讀取中</div>
           `;
         }
         container.appendChild(card);
