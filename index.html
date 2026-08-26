@@ -5,27 +5,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>台股即時強弱看板</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: #0f1117; color: #f0f3f6; padding: 12px 12px 60px 12px; }
     
-    /* 頂部狀態列 */
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #21262d; }
-    .header h1 { font-size: 18px; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 6px; }
+    .header h1 { font-size: 18px; font-weight: 700; color: #ffffff; }
     .status-box { display: flex; align-items: center; gap: 8px; }
     .status { font-size: 11px; color: #8b949e; }
-    .refresh-btn { background: #21262d; color: #58a6ff; border: 1px solid #30363d; padding: 4px 8px; border-radius: 6px; font-size: 11px; cursor: pointer; }
-    .refresh-btn:active { background: #30363d; }
+    .refresh-btn { background: #1f6feb; color: #ffffff; border: none; padding: 5px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
+    .refresh-btn:active { opacity: 0.8; }
 
-    /* 類股標籤列 */
     .sector-bar { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 10px; -webkit-overflow-scrolling: touch; }
     .sector-bar::-webkit-scrollbar { display: none; }
-    .tab-btn { background: #161b22; color: #8b949e; border: 1px solid #30363d; padding: 5px 12px; border-radius: 14px; font-size: 12px; white-space: nowrap; cursor: pointer; transition: all 0.2s; }
-    .tab-btn.active { background: #1f6feb; color: #ffffff; border-color: #1f6feb; font-weight: 600; }
+    .tab-btn { background: #161b22; color: #8b949e; border: 1px solid #30363d; padding: 5px 12px; border-radius: 14px; font-size: 12px; white-space: nowrap; cursor: pointer; }
+    .tab-btn.active { background: #387ed1; color: #ffffff; border-color: #387ed1; font-weight: 600; }
 
-    /* 統計資訊條 */
     .summary-bar { font-size: 11px; color: #8b949e; margin-bottom: 10px; display: flex; justify-content: space-between; padding: 0 2px; }
 
-    /* 股票卡片網格 */
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(105px, 1fr)); gap: 8px; }
     .card { background: #161b22; border-radius: 8px; padding: 8px 10px; border: 1px solid #21262d; display: flex; flex-direction: column; justify-content: space-between; min-height: 72px; }
     .card-top { display: flex; justify-content: space-between; align-items: baseline; }
@@ -34,14 +30,11 @@
     .price { font-size: 16px; font-weight: 700; margin: 2px 0; }
     .change { font-size: 11px; font-weight: 600; }
     
-    /* 台股漲紅跌綠 */
     .up { color: #f85149; }
     .down { color: #3fb950; }
     .equal { color: #8b949e; }
-
-    /* 載入中骨架動畫 */
-    .loading-pulse { animation: pulse 1.2s infinite ease-in-out; }
-    @keyframes pulse { 0% { opacity: 0.4; } 50% { opacity: 0.9; } 100% { opacity: 0.4; } }
+    .pulse { animation: pulse 1s infinite; }
+    @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
   </style>
 </head>
 <body>
@@ -50,30 +43,27 @@
     <h1>📈 即時戰報</h1>
     <div class="status-box">
       <span id="last-update" class="status">載入名單中...</span>
-      <button class="refresh-btn" onclick="fetchLiveQuotes()">刷新</button>
+      <button class="refresh-btn" onclick="fetchLiveQuotes()">⚡ 現場刷新</button>
     </div>
   </div>
 
-  <!-- 類股篩選標籤 -->
   <div id="sector-bar" class="sector-bar">
     <button class="tab-btn active" onclick="filterSector('ALL')">全部</button>
   </div>
 
-  <!-- 類股統計資訊 -->
   <div class="summary-bar">
     <span id="sector-stat">共 0 檔標的</span>
     <span id="sector-adv-dec">漲 0 / 跌 0</span>
   </div>
 
-  <!-- 股票卡片網格 -->
   <div id="stock-container" class="grid"></div>
 
   <script>
-    // 👇【請換成你的 Firebase 資料庫網址，結尾不要加斜線】👇
+    // 👇【請替換成你的 Firebase 資料庫網址】👇
     const FIREBASE_URL = "https://stonk-aae09-default-rtdb.asia-southeast1.firebasedatabase.app";
     
     let allStocksList = {};
-    let latestPrices = {};
+    let latestQuotes = {};
     let currentSector = 'ALL';
 
     async function init() {
@@ -85,15 +75,15 @@
           document.getElementById('last-update').innerText = "未找到名單";
           return;
         }
-        
+
         allStocksList = data.stocks;
         renderSectors(allStocksList);
-        renderCards(); // 先繪製骨架
-        
-        // 現場平行抓取即時行情
+        renderCards(); // 先繪製骨架卡片
+
+        // 現場抓取即時價格
         await fetchLiveQuotes();
       } catch (e) {
-        document.getElementById('last-update').innerText = "載入失敗";
+        document.getElementById('last-update').innerText = "名單載入失敗";
       }
     }
 
@@ -124,12 +114,12 @@
 
     async function fetchLiveQuotes() {
       const statusEl = document.getElementById('last-update');
-      statusEl.innerText = "⚡ 更新中...";
+      statusEl.innerText = "⚡ 正在現場抓價...";
       
       const codes = Object.keys(allStocksList);
       if (codes.length === 0) return;
 
-      // 20 檔一包，利用鎖定好的市場別 (tse/otc) 建立極速查詢封包
+      // 20 檔一包
       const chunks = [];
       for (let i = 0; i < codes.length; i += 20) {
         const chunkCodes = codes.slice(i, i + 20);
@@ -138,12 +128,15 @@
       }
 
       try {
-        // 瀏覽器非同步平行齊發
-        const promises = chunks.map(chunk => 
-          fetch(`https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=${chunk}&json=1&delay=0`)
+        // 使用公開的 allorigins CORS 代理，讓 HTML 瀏覽器可以直接抓證交所！
+        const promises = chunks.map(chunk => {
+          const twseUrl = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=${chunk}&json=1&delay=0`;
+          const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(twseUrl)}`;
+          
+          return fetch(proxyUrl)
             .then(r => r.json())
-            .catch(() => ({ msgArray: [] }))
-        );
+            .catch(() => ({ msgArray: [] }));
+        });
 
         const results = await Promise.all(promises);
         
@@ -152,7 +145,7 @@
             const price = item.z;
             const prev = item.y;
             if (price && price !== '-' && prev && prev !== '-') {
-              latestPrices[item.c] = {
+              latestQuotes[item.c] = {
                 price: parseFloat(price),
                 prev: parseFloat(prev)
               };
@@ -163,7 +156,7 @@
         const now = new Date();
         statusEl.innerText = `🕒 ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}`;
       } catch (e) {
-        statusEl.innerText = "更新逾時";
+        statusEl.innerText = "現場抓取異常";
       }
 
       renderCards();
@@ -178,12 +171,12 @@
         targetCodes = targetCodes.filter(code => (allStocksList[code].sectors || []).includes(currentSector));
       }
 
-      // 依漲跌幅由大到小排序 (若尚未取得報價則排後方)
+      // 依當前最新漲跌幅由大到小排序
       targetCodes.sort((a, b) => {
-        const quoteA = latestPrices[a];
-        const quoteB = latestPrices[b];
-        const pctA = quoteA ? (quoteA.price - quoteA.prev) / quoteA.prev : -999;
-        const pctB = quoteB ? (quoteB.price - quoteB.prev) / quoteB.prev : -999;
+        const qA = latestQuotes[a];
+        const qB = latestQuotes[b];
+        const pctA = qA ? (qA.price - qA.prev) / qA.prev : -999;
+        const pctB = qB ? (qB.price - qB.prev) / qB.prev : -999;
         return pctB - pctA;
       });
 
@@ -192,7 +185,7 @@
 
       targetCodes.forEach(code => {
         const stock = allStocksList[code];
-        const quote = latestPrices[code];
+        const quote = latestQuotes[code];
         const card = document.createElement('div');
         card.className = 'card';
 
@@ -225,14 +218,13 @@
               <span class="name">${stock.name || code}</span>
               <span class="symbol">${code}</span>
             </div>
-            <div class="price equal loading-pulse">--</div>
-            <div class="change equal">讀取中</div>
+            <div class="price equal pulse">--</div>
+            <div class="change equal">抓價中</div>
           `;
         }
         container.appendChild(card);
       });
 
-      // 更新統計列
       document.getElementById('sector-stat').innerText = `共 ${targetCodes.length} 檔標的`;
       document.getElementById('sector-adv-dec').innerHTML = `<span class="up">▲ ${upCount}</span> / <span class="down">▼ ${downCount}</span>`;
     }
