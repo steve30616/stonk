@@ -3,72 +3,115 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>台股即時強弱看板</title>
+  <title>台股即時強弱看板 (Pro版)</title>
   <style>
+    :root {
+      --bg: #0b0e14;
+      --card-bg: #151924;
+      --text-main: #f0f3f6;
+      --text-sub: #8b949e;
+      --up-color: #ff4d4f;   /* 台股漲(紅) */
+      --down-color: #00e676; /* 台股跌(綠) */
+      --up-bg: rgba(255, 77, 79, 0.15);
+      --down-bg: rgba(0, 230, 118, 0.15);
+      --border: #21262d;
+    }
+    
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background-color: #121212; color: #e0e0e0; padding: 16px; }
+    body { background-color: var(--bg); color: var(--text-main); padding: 16px 12px 40px 12px; -webkit-font-smoothing: antialiased; }
     
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-    .header h1 { font-size: 20px; font-weight: bold; color: #ffffff; margin: 0; }
+    /* 頂部導航列 */
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .header h1 { font-size: 22px; font-weight: 800; letter-spacing: 1px; margin: 0; }
     .status-box { display: flex; align-items: center; gap: 10px; }
-    .status { font-size: 12px; color: #888; }
-    .refresh-btn { background: #387ed1; color: #ffffff; border: none; padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; }
-    .refresh-btn:active { opacity: 0.8; }
+    .status { font-size: 12px; color: var(--text-sub); background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 4px; }
+    .refresh-btn { background: #2f81f7; color: #fff; border: none; padding: 6px 14px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(47, 129, 247, 0.2); }
+    .refresh-btn:active { transform: scale(0.95); }
 
-    .sector-bar { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 16px; -webkit-overflow-scrolling: touch; }
+    /* 類股標籤列 (隱藏捲軸) */
+    .sector-bar { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 12px; scroll-behavior: smooth; }
     .sector-bar::-webkit-scrollbar { display: none; }
-    .tab-btn { background: #222; color: #aaa; border: 1px solid #333; padding: 8px 16px; border-radius: 16px; font-size: 14px; white-space: nowrap; cursor: pointer; }
-    .tab-btn.active { background: #387ed1; color: #ffffff; border-color: #387ed1; font-weight: bold; }
+    .tab-btn { background: transparent; color: var(--text-sub); border: 1px solid var(--border); padding: 8px 18px; border-radius: 20px; font-size: 14px; font-weight: 500; white-space: nowrap; cursor: pointer; transition: 0.2s; }
+    .tab-btn.active { background: #2f81f7; color: #ffffff; border-color: #2f81f7; font-weight: 700; }
 
-    .summary-bar { font-size: 13px; color: #888; margin-bottom: 12px; display: flex; justify-content: space-between; }
+    /* 統計列 */
+    .summary-bar { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-sub); margin-bottom: 16px; padding: 0 4px; }
+    .summary-bar span strong { color: var(--text-main); font-weight: 600; }
 
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
-    .card { background: #1e1e1e; border-radius: 8px; padding: 12px; border: 1px solid #2a2a2a; display: flex; flex-direction: column; justify-content: space-between; min-height: 90px; }
-    .card-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
-    .name { font-size: 15px; font-weight: bold; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80px; }
-    .symbol { font-size: 12px; color: #888; }
-    .price { font-size: 20px; font-weight: bold; margin-bottom: 4px; }
-    .change { font-size: 13px; font-weight: 500; }
+    /* 雙欄大卡片網格 (手機端完美 2 欄) */
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
     
-    .up { color: #f23645; }
-    .down { color: #089981; }
-    .equal { color: #888; }
-    .pulse { animation: pulse 1s infinite; }
-    @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+    /* 卡片設計 */
+    .card { background: var(--card-bg); border-radius: 12px; padding: 14px; border: 1px solid var(--border); display: flex; flex-direction: column; justify-content: space-between; min-height: 100px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
+    .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+    .name-box { display: flex; flex-direction: column; gap: 2px; }
+    .name { font-size: 16px; font-weight: 700; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90px; }
+    .symbol { font-size: 12px; color: var(--text-sub); font-weight: 500; }
+    
+    .card-bottom { display: flex; justify-content: space-between; align-items: flex-end; }
+    .price { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+    
+    /* 漲跌幅膠囊 */
+    .change-pill { font-size: 13px; font-weight: 700; padding: 4px 8px; border-radius: 6px; display: inline-block; }
+    
+    .up .price { color: var(--up-color); }
+    .up .change-pill { color: var(--up-color); background: var(--up-bg); }
+    
+    .down .price { color: var(--down-color); }
+    .down .change-pill { color: var(--down-color); background: var(--down-bg); }
+    
+    .equal .price { color: var(--text-sub); }
+    .equal .change-pill { color: var(--text-sub); background: rgba(255,255,255,0.05); }
+
+    /* 動態效果 */
+    .pulse { animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+    
+    /* 錯誤訊息提示 */
+    #error-log { color: var(--up-color); font-size: 12px; margin-top: 10px; text-align: center; }
   </style>
 </head>
 <body>
 
   <div class="header">
-    <h1>📈 即時戰報</h1>
+    <h1>即時戰報</h1>
     <div class="status-box">
-      <span id="last-update" class="status">載入名單中...</span>
+      <span id="last-update" class="status">初始化中...</span>
       <button class="refresh-btn" onclick="fetchLiveQuotes()">刷新</button>
     </div>
   </div>
 
   <div id="sector-bar" class="sector-bar">
-    <button class="tab-btn active" onclick="filterSector('ALL')">全部</button>
+    <button class="tab-btn active" onclick="filterSector('ALL')">全部標的</button>
   </div>
 
   <div class="summary-bar">
-    <span id="sector-stat">共 0 檔標的</span>
-    <span id="sector-adv-dec">漲 0 / 跌 0</span>
+    <span id="sector-stat">載入中...</span>
+    <span id="sector-adv-dec">-</span>
   </div>
 
   <div id="stock-container" class="grid"></div>
+  <div id="error-log"></div>
 
   <script>
-    // 👇【1. 替換成你的 Firebase 資料庫網址】👇
+    // ==========================================
+    // 👇 1. 請替換成你的 Firebase 資料庫網址 👇
     const FIREBASE_URL = "https://stonk-aae09-default-rtdb.asia-southeast1.firebasedatabase.app";
 
-    // 👇【2. 替換成剛剛在 Google Cloud 複製的 Function URL】👇
+    // 👇 2. 請替換成你的 Google Cloud Function 網址 👇
     const GCF_URL = "https://tw-stock-quotes-955770872872.asia-east1.run.app";
-    
+    // ==========================================
+
     let allStocksList = {};
     let latestQuotes = {};
     let currentSector = 'ALL';
     let autoRefreshTimer = null;
+
+    // 清理數字字串 (解決千元股如 "1,050.00" 的解析問題)
+    const parsePrice = (val) => {
+      if (!val || val === '-') return NaN;
+      return parseFloat(val.toString().replace(/,/g, ''));
+    };
 
     async function init() {
       try {
@@ -76,35 +119,36 @@
         const data = await resp.json();
         
         if (!data || !data.stocks) {
-          document.getElementById('last-update').innerText = "未找到名單";
+          showError("找不到名單，請確認 Firebase 是否已同步！");
           return;
         }
 
         allStocksList = data.stocks;
         renderSectors(allStocksList);
-        renderCards(); 
+        renderCards(); // 先畫出骨架
 
         await fetchLiveQuotes();
-        startAutoRefresh();
+        
+        // 啟動 60 秒定時刷新
+        if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+        autoRefreshTimer = setInterval(() => {
+          if (!document.hidden) fetchLiveQuotes();
+        }, 60000);
+
       } catch (e) {
-        document.getElementById('last-update').innerText = "名單載入失敗";
+        showError(`清單載入失敗: ${e.message}`);
       }
     }
 
-    function startAutoRefresh() {
-      if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-      autoRefreshTimer = setInterval(() => {
-        if (!document.hidden) {
-          fetchLiveQuotes();
-        }
-      }, 60000);
-    }
-
+    // 網頁切回前景時立刻補刷
     document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) {
-        fetchLiveQuotes();
-      }
+      if (!document.hidden) fetchLiveQuotes();
     });
+
+    function showError(msg) {
+      document.getElementById('last-update').innerText = "發生錯誤";
+      document.getElementById('error-log').innerText = msg;
+    }
 
     function renderSectors(stocks) {
       const sectors = new Set();
@@ -113,7 +157,7 @@
       });
       
       const bar = document.getElementById('sector-bar');
-      bar.innerHTML = `<button class="tab-btn active" onclick="filterSector('ALL')">全部</button>`;
+      bar.innerHTML = `<button class="tab-btn active" onclick="filterSector('ALL')">全部標的</button>`;
       sectors.forEach(sec => {
         const btn = document.createElement('button');
         btn.className = 'tab-btn';
@@ -126,60 +170,61 @@
     function filterSector(sec) {
       currentSector = sec;
       document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.innerText === (sec === 'ALL' ? '全部' : sec));
+        btn.classList.toggle('active', btn.innerText === (sec === 'ALL' ? '全部標的' : sec));
       });
       renderCards();
     }
 
     async function fetchLiveQuotes() {
       const statusEl = document.getElementById('last-update');
-      statusEl.innerText = "⚡ 現場抓價中...";
+      document.getElementById('error-log').innerText = ''; // 清除舊錯誤
+      statusEl.innerText = "連線抓取中...";
       
       const codes = Object.keys(allStocksList);
       if (codes.length === 0) return;
 
-      // 前端每 80 檔切成一組，避免單次 GET URL 過長
+      // 嚴格限制每次請求最多 40 檔，避免 URL 過長被 Server 拒絕
       const chunks = [];
-      for (let i = 0; i < codes.length; i += 80) {
-        const sliceCodes = codes.slice(i, i + 80);
+      for (let i = 0; i < codes.length; i += 40) {
+        const sliceCodes = codes.slice(i, i + 40);
         const queryStr = sliceCodes.map(c => `${allStocksList[c].market || 'tse'}_${c}.tw`).join('|');
         chunks.push(queryStr);
       }
 
       try {
-        const promises = chunks.map(chunk => 
-          fetch(`${GCF_URL}?ex_ch=${encodeURIComponent(chunk)}`)
-            .then(res => res.json())
-            .catch(() => ({ msgArray: [] }))
-        );
+        const promises = chunks.map(async (chunk) => {
+          const res = await fetch(`${GCF_URL}?ex_ch=${encodeURIComponent(chunk)}`);
+          if (!res.ok) throw new Error(`連線代碼 ${res.status}`);
+          return res.json();
+        });
 
         const results = await Promise.all(promises);
 
         results.forEach(data => {
-          (data.msgArray || []).forEach(item => {
-            const prev = parseFloat(item.y);
-            // 優先順序：成交價(z) -> 盤前試撮價(pz) -> 昨收價(y)
-            let rawPrice = item.z;
-            if (!rawPrice || rawPrice === '-') {
-              rawPrice = item.pz && item.pz !== '-' ? item.pz : item.y;
-            }
+          if (!data || !data.msgArray) return;
+          
+          data.msgArray.forEach(item => {
+            const prev = parsePrice(item.y);
             
-            const price = parseFloat(rawPrice);
+            // 優先順序：盤中成交價(z) -> 盤前試撮價(pz) -> 昨收價(y)
+            let rawPrice = (item.z && item.z !== '-') ? item.z : 
+                           (item.pz && item.pz !== '-') ? item.pz : item.y;
+                           
+            const price = parsePrice(rawPrice);
 
             if (!isNaN(price) && !isNaN(prev) && prev > 0) {
               latestQuotes[item.c] = {
                 price: price,
-                prev: prev,
-                isMatch: (item.z && item.z !== '-') // 是否為盤中實際成交
+                prev: prev
               };
             }
           });
         });
 
         const now = new Date();
-        statusEl.innerText = `🕒 ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}`;
+        statusEl.innerText = `${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}`;
       } catch (e) {
-        statusEl.innerText = "抓取異常";
+        showError(`價格抓取失敗: ${e.message}`);
       }
 
       renderCards();
@@ -210,46 +255,64 @@
         const stock = allStocksList[code];
         const quote = latestQuotes[code];
         const card = document.createElement('div');
-        card.className = 'card';
-
+        
         if (quote) {
           const diff = quote.price - quote.prev;
           const pct = ((diff / quote.prev) * 100).toFixed(2);
-          let colorClass = 'equal';
+          
+          let stateClass = 'equal';
           let sign = '';
           
           if (diff > 0.0001) { 
-            colorClass = 'up'; 
+            stateClass = 'up'; 
             sign = '+'; 
             upCount++;
           } else if (diff < -0.0001) { 
-            colorClass = 'down'; 
+            stateClass = 'down'; 
             downCount++;
           }
 
+          card.className = `card ${stateClass}`;
+          
+          // 判斷是否為整數或小數以優化顯示
+          const displayPrice = quote.price % 1 === 0 ? quote.price : quote.price.toFixed(2);
+
           card.innerHTML = `
             <div class="card-top">
-              <span class="name" title="${stock.name}">${stock.name || code}</span>
-              <span class="symbol">${code}</span>
+              <div class="name-box">
+                <span class="name" title="${stock.name}">${stock.name || code}</span>
+                <span class="symbol">${code}</span>
+              </div>
             </div>
-            <div class="price ${colorClass}">${quote.price.toFixed(2)}</div>
-            <div class="change ${colorClass}">${sign}${pct}%</div>
+            <div class="card-bottom">
+              <span class="price">${displayPrice}</span>
+              <span class="change-pill">${sign}${pct}%</span>
+            </div>
           `;
         } else {
+          // 抓不到資料或還在讀取
+          card.className = 'card equal pulse';
           card.innerHTML = `
             <div class="card-top">
-              <span class="name">${stock.name || code}</span>
-              <span class="symbol">${code}</span>
+              <div class="name-box">
+                <span class="name">${stock.name || code}</span>
+                <span class="symbol">${code}</span>
+              </div>
             </div>
-            <div class="price equal pulse">--</div>
-            <div class="change equal">載入中</div>
+            <div class="card-bottom">
+              <span class="price">--</span>
+              <span class="change-pill">讀取中</span>
+            </div>
           `;
         }
         container.appendChild(card);
       });
 
-      document.getElementById('sector-stat').innerText = `共 ${targetCodes.length} 檔標的`;
-      document.getElementById('sector-adv-dec').innerHTML = `<span class="up">▲ ${upCount}</span> / <span class="down">▼ ${downCount}</span>`;
+      document.getElementById('sector-stat').innerHTML = `總計 <strong>${targetCodes.length}</strong> 檔`;
+      document.getElementById('sector-adv-dec').innerHTML = `
+        <span style="color:var(--up-color); font-weight:700;">▲ ${upCount}</span> &nbsp;|&nbsp; 
+        <span style="color:var(--down-color); font-weight:700;">▼ ${downCount}</span>
+      `;
     }
 
     init();
