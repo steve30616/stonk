@@ -29,11 +29,16 @@
     .btn-icon { background: transparent; border: 1px solid var(--border); padding: 6px 10px; font-size: 14px; border-radius: 8px; }
     .btn:active { transform: scale(0.95); }
 
-    /* 類股標籤列 */
-    .sector-bar { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 4px; scroll-behavior: smooth; }
+    /* 類股標籤列 (支援首項固定) */
+    .sector-bar { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 4px; scroll-behavior: smooth; position: relative; }
     .sector-bar::-webkit-scrollbar { display: none; }
+    
     .tab-btn { background: transparent; color: var(--text-sub); border: 1px solid var(--border); padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 500; white-space: nowrap; cursor: pointer; transition: 0.2s; }
     .tab-btn.active { background: #2f81f7; color: #ffffff; border-color: #2f81f7; font-weight: 700; }
+    
+    /* 首頁標籤固定在左側 */
+    .sticky-tab { position: sticky; left: 0; z-index: 10; box-shadow: 4px 0 10px var(--bg); }
+    .sticky-tab:not(.active) { background-color: #161b22; color: #fff; }
 
     /* 統計列 */
     .summary-bar { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-sub); margin-bottom: 12px; padding: 0 4px; }
@@ -46,11 +51,12 @@
     
     .card-left { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
     
-    /* 名次標籤 */
-    .rank-badge { font-size: 15px; font-weight: 900; color: #4b5563; min-width: 28px; text-align: center; font-style: italic; }
-    .rank-1 { color: #fbbf24; font-size: 18px; } /* 金 */
-    .rank-2 { color: #9ca3af; font-size: 17px; } /* 銀 */
-    .rank-3 { color: #b45309; font-size: 16px; } /* 銅 */
+    /* 🥇 金銀銅名次徽章設計 */
+    .rank-badge { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; font-size: 14px; font-weight: 900; flex-shrink: 0; }
+    .rank-1 { background: linear-gradient(135deg, #FBE18D 0%, #D89F3C 100%); color: #5C3A00; box-shadow: 0 2px 8px rgba(216,159,60,0.5); }
+    .rank-2 { background: linear-gradient(135deg, #E2E8F0 0%, #94A3B8 100%); color: #1E293B; box-shadow: 0 2px 8px rgba(148,163,184,0.5); }
+    .rank-3 { background: linear-gradient(135deg, #FDBA74 0%, #B45309 100%); color: #431407; box-shadow: 0 2px 8px rgba(180,83,9,0.5); }
+    .rank-other { background: transparent; color: #4b5563; font-style: italic; font-size: 15px; }
 
     /* 資訊區塊 */
     .info-box { display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
@@ -88,6 +94,7 @@
     
     .setting-group { margin-bottom: 20px; }
     .setting-group label { display: block; font-size: 14px; margin-bottom: 8px; font-weight: 600; color: var(--text-sub); }
+    .setting-hint { font-size: 11px; color: #58a6ff; margin-bottom: 6px; display: block; }
     .setting-group input, .setting-group select { width: 100%; background: #0d1117; border: 1px solid var(--border); color: #fff; padding: 10px; border-radius: 8px; font-size: 16px; outline: none; }
     
     .modal-actions { display: flex; gap: 10px; margin-top: 10px; }
@@ -100,7 +107,7 @@
 <body>
 
   <div class="header">
-    <h1>🏆 即時排行榜</h1>
+    <h1>🏆 綜合強弱榜</h1>
     <div class="status-box">
       <span id="last-update" class="status">載入中...</span>
       <button class="btn" onclick="fetchLiveQuotes()">刷新</button>
@@ -108,8 +115,10 @@
     </div>
   </div>
 
+  <!-- 標籤列 (最左邊固定) -->
   <div id="sector-bar" class="sector-bar">
-    <button class="tab-btn active" onclick="setSector('RANKING')">👑 強弱排行</button>
+    <button class="tab-btn sticky-tab active" onclick="setSector('RANKING')">👑 綜合強弱</button>
+    <!-- 其他族群會動態加在這裡，並可以往右滑動 -->
   </div>
 
   <div class="summary-bar">
@@ -120,22 +129,24 @@
   <div id="stock-container" class="list-container"></div>
   <div id="error-log"></div>
 
-  <!-- 設定選單 Modal -->
+  <!-- 設定選單 Modal (點擊外部自動關閉) -->
   <div id="settings-modal" class="modal-overlay" onclick="closeSettings(event)">
     <div class="modal-content" onclick="event.stopPropagation()">
-      <h2>⚙️ 系統設定</h2>
+      <h2>⚙️ 策略參數設定</h2>
       
       <div class="setting-group">
-        <label>自動更新頻率 (秒)</label>
-        <input type="number" id="input-interval" placeholder="例如: 60" min="10">
+        <label>懲罰機制 (過度下跌扣分)</label>
+        <span class="setting-hint">若族群下跌家數大於上漲，分數額外扣減</span>
+        <select id="input-punish">
+          <option value="true">開啟 (嚴格排行)</option>
+          <option value="false">關閉 (原始分數)</option>
+        </select>
       </div>
       
       <div class="setting-group">
-        <label>顯示齊漲齊跌指標</label>
-        <select id="input-comove">
-          <option value="true">開啟 (顯示)</option>
-          <option value="false">關閉 (隱藏)</option>
-        </select>
+        <label>族群分數額外加成 (%)</label>
+        <span class="setting-hint">套用至所有族群的基礎分數加成</span>
+        <input type="number" id="input-bonus" placeholder="預設: 0" step="0.1">
       </div>
 
       <div class="modal-actions">
@@ -156,8 +167,8 @@
 
     // 預設設定值
     const DEFAULT_SETTINGS = {
-      refreshInterval: 60,
-      showCoMovement: true
+      punishmentEnabled: true, // 預設開啟懲罰機制
+      scoreBonus: 0            // 預設 0 加成
     };
     
     let userSettings = { ...DEFAULT_SETTINGS };
@@ -174,26 +185,32 @@
 
     async function init() {
       try {
-        // 並行讀取名單與設定檔，加速啟動
         const [listResp, settingsResp] = await Promise.all([
           fetch(`${FIREBASE_URL}/stock_list.json`),
-          fetch(`${FIREBASE_URL}/settings.json`)
+          fetch(`${FIREBASE_URL}/settings.json`).catch(() => null)
         ]);
 
         const listData = await listResp.json();
-        const settingsData = await settingsResp.json();
+        let settingsData = null;
+        if (settingsResp && settingsResp.ok) {
+          settingsData = await settingsResp.json();
+        }
         
         if (!listData || !listData.stocks) throw new Error("Firebase 無股票名單");
         allStocksList = listData.stocks;
         
-        // 套用雲端設定
         if (settingsData) userSettings = { ...DEFAULT_SETTINGS, ...settingsData };
         
         renderSectors();
         renderCards(); 
 
         await fetchLiveQuotes();
-        startAutoRefresh();
+        
+        // 預設背景 60 秒刷新
+        if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+        autoRefreshTimer = setInterval(() => {
+          if (!document.hidden) fetchLiveQuotes();
+        }, 60000);
 
       } catch (e) {
         showError(e.message);
@@ -202,9 +219,8 @@
 
     // --- 設定選單邏輯 ---
     function openSettings() {
-      // 開啟時載入目前設定值
-      document.getElementById('input-interval').value = userSettings.refreshInterval;
-      document.getElementById('input-comove').value = userSettings.showCoMovement.toString();
+      document.getElementById('input-punish').value = userSettings.punishmentEnabled.toString();
+      document.getElementById('input-bonus').value = userSettings.scoreBonus;
       document.getElementById('settings-modal').classList.add('active');
     }
 
@@ -213,13 +229,12 @@
     }
 
     async function saveSettings() {
-      const interval = parseInt(document.getElementById('input-interval').value) || 60;
-      const coMove = document.getElementById('input-comove').value === 'true';
+      const punish = document.getElementById('input-punish').value === 'true';
+      const bonus = parseFloat(document.getElementById('input-bonus').value) || 0;
       
-      userSettings = { refreshInterval: interval < 10 ? 10 : interval, showCoMovement: coMove };
+      userSettings = { punishmentEnabled: punish, scoreBonus: bonus };
       
       try {
-        // 存回 Firebase (需確認 Rules 允許 .write)
         await fetch(`${FIREBASE_URL}/settings.json`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -230,21 +245,15 @@
       }
 
       document.getElementById('settings-modal').classList.remove('active');
-      startAutoRefresh(); // 重新套用計時器
-      renderCards(); // 重新渲染畫面以套用「齊漲齊跌」顯示設定
+      calculateSectorStats(); // 重新計算包含懲罰與加成的分數
+      renderSectors();        // 重新排版籤列
+      renderCards();          // 重新排版卡片
     }
 
     async function resetSettings() {
       userSettings = { ...DEFAULT_SETTINGS };
-      document.getElementById('input-interval').value = userSettings.refreshInterval;
-      document.getElementById('input-comove').value = userSettings.showCoMovement.toString();
-    }
-
-    function startAutoRefresh() {
-      if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-      autoRefreshTimer = setInterval(() => {
-        if (!document.hidden) fetchLiveQuotes();
-      }, userSettings.refreshInterval * 1000);
+      document.getElementById('input-punish').value = userSettings.punishmentEnabled.toString();
+      document.getElementById('input-bonus').value = userSettings.scoreBonus;
     }
 
     document.addEventListener("visibilitychange", () => {
@@ -330,14 +339,28 @@
         });
       });
 
+      // 結算並套用策略：分數加成 & 懲罰機制
       Object.keys(sectorStats).forEach(sec => {
-        sectorStats[sec].avgPct = sectorStats[sec].sumPct / sectorStats[sec].count;
+        let baseAvg = sectorStats[sec].sumPct / sectorStats[sec].count;
+        
+        // 1. 套用全域分數加成
+        baseAvg += (userSettings.scoreBonus || 0);
+
+        // 2. 套用懲罰機制 (若下跌家數大於上漲，分數扣減 1.5%)
+        if (userSettings.punishmentEnabled) {
+          if (sectorStats[sec].down > sectorStats[sec].up) {
+            baseAvg -= 1.5; 
+          }
+        }
+        
+        sectorStats[sec].avgPct = baseAvg;
       });
     }
 
     function renderSectors() {
       const bar = document.getElementById('sector-bar');
-      bar.innerHTML = `<button class="tab-btn ${currentSector === 'RANKING' ? 'active' : ''}" onclick="setSector('RANKING')">👑 強弱排行</button>`;
+      // 確保「綜合強弱」永遠釘選在最左側
+      bar.innerHTML = `<button class="tab-btn sticky-tab ${currentSector === 'RANKING' ? 'active' : ''}" onclick="setSector('RANKING')">👑 綜合強弱</button>`;
       
       const sortedSectors = Object.keys(sectorStats).sort((a, b) => sectorStats[b].avgPct - sectorStats[a].avgPct);
       
@@ -360,6 +383,14 @@
       });
     }
 
+    // 產生名次徽章 (金銀銅)
+    function getRankHtml(index) {
+      if (index === 0) return `<div class="rank-badge rank-1">1</div>`;
+      if (index === 1) return `<div class="rank-badge rank-2">2</div>`;
+      if (index === 2) return `<div class="rank-badge rank-3">3</div>`;
+      return `<div class="rank-badge rank-other">${index + 1}</div>`;
+    }
+
     function renderCards() {
       const container = document.getElementById('stock-container');
       container.innerHTML = '';
@@ -370,7 +401,7 @@
 
     // 【單欄渲染：類股強弱】
     function renderRankingBoard(container) {
-      document.querySelector('.header h1').innerText = "🏆 即時排行榜";
+      document.querySelector('.header h1').innerHTML = "🏆 綜合強弱榜";
       const sortedSectors = Object.keys(sectorStats).sort((a, b) => sectorStats[b].avgPct - sectorStats[a].avgPct);
       
       if (sortedSectors.length === 0) return;
@@ -388,7 +419,7 @@
 
         // 計算齊漲齊跌火力
         let coHtml = '';
-        if (userSettings.showCoMovement && stat.count > 0) {
+        if (stat.count > 0) {
           const upRate = Math.round((stat.up / stat.count) * 100);
           const downRate = Math.round((stat.down / stat.count) * 100);
           if (upRate >= 50) coHtml = `<span class="co-movement co-up">🔥 齊漲率 ${upRate}%</span>`;
@@ -396,7 +427,7 @@
           else coHtml = `<span class="co-movement co-flat">波動分散</span>`;
         }
 
-        const rankClass = index < 3 ? `rank-${index + 1}` : '';
+        const rankHtml = getRankHtml(index);
 
         const card = document.createElement('div');
         card.className = `card ${stateClass}`;
@@ -404,7 +435,7 @@
         
         card.innerHTML = `
           <div class="card-left">
-            <div class="rank-badge ${rankClass}">#${index + 1}</div>
+            ${rankHtml}
             <div class="info-box">
               <div class="s-name">${sec}</div>
               <div class="s-stat">漲 ${stat.up} / 跌 ${stat.down} / 平 ${stat.count - stat.up - stat.down}</div>
@@ -424,7 +455,7 @@
 
     // 【單欄渲染：個股清單】
     function renderStockList(container) {
-      document.querySelector('.header h1').innerText = `🔥 ${currentSector}`;
+      document.querySelector('.header h1').innerHTML = `🔥 ${currentSector}`;
       let targetCodes = Object.keys(allStocksList).filter(code => (allStocksList[code].sectors || []).includes(currentSector));
 
       targetCodes.sort((a, b) => {
@@ -441,7 +472,7 @@
         const quote = latestQuotes[code];
         const card = document.createElement('div');
         
-        const rankClass = index < 3 ? `rank-${index + 1}` : '';
+        const rankHtml = getRankHtml(index);
 
         if (quote) {
           const diff = quote.price - quote.prev;
@@ -456,7 +487,7 @@
 
           card.innerHTML = `
             <div class="card-left">
-              <div class="rank-badge ${rankClass}">#${index + 1}</div>
+              ${rankHtml}
               <div class="info-box">
                 <div class="name">${stock.name || code}</div>
                 <div class="symbol">${code}</div>
@@ -471,7 +502,7 @@
           card.className = 'card equal pulse';
           card.innerHTML = `
             <div class="card-left">
-              <div class="rank-badge ${rankClass}">#${index + 1}</div>
+              ${rankHtml}
               <div class="info-box"><div class="name">${stock.name || code}</div><div class="symbol">${code}</div></div>
             </div>
             <div class="card-right"><div class="price">--</div><div class="change-pill">讀取中</div></div>
