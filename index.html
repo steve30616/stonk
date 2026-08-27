@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>台股類股即時強弱看板</title>
+  <title>台股類股火力看板 (20分制)</title>
   <style>
     :root {
       --bg: #0d0f12; --card-bg: #161920; --card-inner: #1c212b;
@@ -32,7 +32,7 @@
     #paramPanel { background: var(--card-bg); border-radius: 16px; padding: 20px; width: 90%; max-width: 350px; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.8); animation: zoomIn 0.2s ease-out; }
     @keyframes zoomIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
     
-    .param-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .param-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid var(--border); padding-bottom: 12px;}
     .param-title { font-size: 15px; font-weight: 700; color: #fff; }
     .param-grid { display: grid; grid-template-columns: 1fr; gap: 14px; margin-bottom: 14px; }
     .param-item { display: flex; flex-direction: column; gap: 6px; }
@@ -40,8 +40,8 @@
     .param-val-badge { font-weight: 700; color: var(--accent); }
     .slider { width: 100%; accent-color: var(--accent); }
     .param-btn-group { display: flex; gap: 10px; }
-    .btn-reset { flex: 1; background: #2a2e39; border: 1px solid var(--border); color: var(--text-main); padding: 8px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
-    .btn-save-cloud { flex: 1; background: #1976d2; border: none; color: white; padding: 8px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .btn-reset { flex: 1; background: #2a2e39; border: 1px solid var(--border); color: var(--text-main); padding: 10px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .btn-save-cloud { flex: 1; background: #1976d2; border: none; color: white; padding: 10px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
     
     .container { padding: 14px 16px; max-width: 650px; margin: 0 auto; }
     .status-summary { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-sub); margin-bottom: 12px; padding: 0 2px; }
@@ -52,21 +52,25 @@
     .cat-header { padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
     .cat-left { display: flex; align-items: center; gap: 12px; }
     
-    .rank-badge { width: 26px; height: 26px; border-radius: 8px; background: var(--card-inner); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: var(--text-sub); flex-shrink: 0; }
-    .rank-1 { background: linear-gradient(135deg, #ffb300, #ff6f00); color: #000; }
-    .rank-2 { background: linear-gradient(135deg, #cfd8dc, #90a4ae); color: #000; }
-    .rank-3 { background: linear-gradient(135deg, #ff8a65, #d84315); color: #000; }
+    .rank-badge { width: 28px; height: 28px; border-radius: 50%; background: var(--card-inner); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; color: var(--text-sub); flex-shrink: 0; }
+    .rank-1 { background: linear-gradient(135deg, #FBE18D 0%, #D89F3C 100%); color: #5C3A00; box-shadow: 0 2px 8px rgba(216,159,60,0.4); }
+    .rank-2 { background: linear-gradient(135deg, #E2E8F0 0%, #94A3B8 100%); color: #1E293B; box-shadow: 0 2px 8px rgba(148,163,184,0.4); }
+    .rank-3 { background: linear-gradient(135deg, #FDBA74 0%, #B45309 100%); color: #431407; box-shadow: 0 2px 8px rgba(180,83,9,0.4); }
     
     .cat-title { font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 2px; }
     .cat-subtitle { font-size: 12px; color: var(--text-sub); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 2px; }
     .tag-status { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: #2a2e39; color: #90caf9; }
     .tag-warn { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: var(--warn-bg); color: var(--warn); }
-    .cat-right { display: flex; align-items: center; gap: 10px; }
+    .cat-right { display: flex; align-items: center; gap: 8px; }
     
-    .pct-tag { min-width: 78px; text-align: right; padding: 6px 10px; border-radius: 8px; font-size: 15px; font-weight: 700; }
-    .is-up { color: var(--up); background: var(--up-bg); }
-    .is-down { color: var(--down); background: var(--down-bg); }
-    .is-flat { color: var(--flat); background: var(--flat-bg); }
+    /* 20分制分數標籤 */
+    .pct-tag { min-width: 65px; text-align: center; padding: 6px 8px; border-radius: 8px; font-size: 16px; font-weight: 800; display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
+    .score-unit { font-size: 9px; font-weight: 600; opacity: 0.8; margin-top: 1px; }
+    
+    .is-up { color: var(--up); background: var(--up-bg); border: 1px solid rgba(255, 59, 48, 0.2); }
+    .is-down { color: var(--down); background: var(--down-bg); border: 1px solid rgba(52, 199, 89, 0.2); }
+    .is-flat { color: var(--flat); background: var(--flat-bg); border: 1px solid rgba(139, 148, 158, 0.2); }
+    
     .chevron { font-size: 11px; color: var(--text-muted); transition: transform 0.25s; }
     .cat-card.expanded .chevron { transform: rotate(180deg); }
     
@@ -97,18 +101,17 @@
   <header>
     <div class="brand-box">
       <div class="brand-dot"></div>
-      <div class="brand-title">類股即時強弱</div>
+      <div class="brand-title">類股火力排行榜</div>
     </div>
     <div class="header-actions">
-      <button class="btn-icon" onclick="openParamPanel()">⚙️ 參數</button>
+      <button class="btn-icon" onclick="openParamPanel()">⚙️ 策略</button>
       <button class="btn-refresh" onclick="manualRefresh()">手動刷新</button>
     </div>
   </header>
 
-  <!-- 點擊背景可關閉的 Modal 選單 -->
   <div id="paramOverlay" class="modal-overlay" onclick="closeParamPanel(event)">
     <div id="paramPanel" onclick="event.stopPropagation()">
-      <div class="param-title-row"><div class="param-title">⚙️ 動態強度參數微調</div></div>
+      <div class="param-title-row"><div class="param-title">⚙️ 火力評估機制 (20分制)</div></div>
       <div class="param-grid">
         <div class="param-item">
           <div class="param-label-row"><span>成交量低標門檻</span><span class="param-val-badge"><span id="lbl_volThreshold">300</span> 張</span></div>
@@ -119,17 +122,17 @@
           <input type="range" class="slider" id="sl_breadthThreshold" min="50" max="90" step="5" value="70" oninput="onParamChange()">
         </div>
         <div class="param-item">
-          <div class="param-label-row"><span>齊漲加成倍數</span><span class="param-val-badge"><span id="lbl_breadthMultiplier">1.2</span> x</span></div>
-          <input type="range" class="slider" id="sl_breadthMultiplier" min="1.0" max="1.8" step="0.05" value="1.2" oninput="onParamChange()">
+          <div class="param-label-row"><span>齊漲額外加分</span><span class="param-val-badge">+ <span id="lbl_breadthBonus">2.0</span> 分</span></div>
+          <input type="range" class="slider" id="sl_breadthBonus" min="0.0" max="5.0" step="0.5" value="2.0" oninput="onParamChange()">
         </div>
         <div class="param-item">
-          <div class="param-label-row"><span>假強勢懲罰折扣</span><span class="param-val-badge"><span id="lbl_penaltyDiscount">0.7</span> x</span></div>
-          <input type="range" class="slider" id="sl_penaltyDiscount" min="0.5" max="1.0" step="0.05" value="0.7" oninput="onParamChange()">
+          <div class="param-label-row"><span>跌多漲少扣分</span><span class="param-val-badge">- <span id="lbl_penaltyPoints">1.5</span> 分</span></div>
+          <input type="range" class="slider" id="sl_penaltyPoints" min="0.0" max="5.0" step="0.5" value="1.5" oninput="onParamChange()">
         </div>
       </div>
       <div class="param-btn-group">
-        <button class="btn-reset" onclick="resetToDefaults()">🔄 恢復預設值</button>
-        <button class="btn-save-cloud" onclick="saveToCloud()">💾 存為預設設定</button>
+        <button class="btn-reset" onclick="resetToDefaults()">🔄 恢復預設</button>
+        <button class="btn-save-cloud" onclick="saveToCloud()">💾 存為預設</button>
       </div>
     </div>
   </div>
@@ -154,8 +157,8 @@
     const DEFAULT_PARAMS = {
       volThreshold: 300,
       breadthThreshold: 70,
-      breadthMultiplier: 1.2,
-      penaltyDiscount: 0.7
+      breadthBonus: 2.0,      
+      penaltyPoints: 1.5      
     };
 
     let userSettings = { ...DEFAULT_PARAMS };
@@ -163,11 +166,6 @@
     let latestQuotes = {};
     const expandedSet = new Set();
     let isFetching = false;
-
-    const parsePrice = (val) => {
-      if (!val || val === '-') return NaN;
-      return parseFloat(val.toString().replace(/,/g, ''));
-    };
 
     async function init() {
       try {
@@ -197,17 +195,17 @@
       document.getElementById('lbl_volThreshold').innerText = p.volThreshold;
       document.getElementById('sl_breadthThreshold').value = p.breadthThreshold;
       document.getElementById('lbl_breadthThreshold').innerText = p.breadthThreshold;
-      document.getElementById('sl_breadthMultiplier').value = p.breadthMultiplier;
-      document.getElementById('lbl_breadthMultiplier').innerText = p.breadthMultiplier;
-      document.getElementById('sl_penaltyDiscount').value = p.penaltyDiscount;
-      document.getElementById('lbl_penaltyDiscount').innerText = p.penaltyDiscount;
+      document.getElementById('sl_breadthBonus').value = p.breadthBonus;
+      document.getElementById('lbl_breadthBonus').innerText = parseFloat(p.breadthBonus).toFixed(1);
+      document.getElementById('sl_penaltyPoints').value = p.penaltyPoints;
+      document.getElementById('lbl_penaltyPoints').innerText = parseFloat(p.penaltyPoints).toFixed(1);
     }
 
     function onParamChange() {
       document.getElementById('lbl_volThreshold').innerText = document.getElementById('sl_volThreshold').value;
       document.getElementById('lbl_breadthThreshold').innerText = document.getElementById('sl_breadthThreshold').value;
-      document.getElementById('lbl_breadthMultiplier').innerText = document.getElementById('sl_breadthMultiplier').value;
-      document.getElementById('lbl_penaltyDiscount').innerText = document.getElementById('sl_penaltyDiscount').value;
+      document.getElementById('lbl_breadthBonus').innerText = parseFloat(document.getElementById('sl_breadthBonus').value).toFixed(1);
+      document.getElementById('lbl_penaltyPoints').innerText = parseFloat(document.getElementById('sl_penaltyPoints').value).toFixed(1);
       recalculateAndRender();
     }
 
@@ -220,8 +218,8 @@
       userSettings = {
         volThreshold: Number(document.getElementById('sl_volThreshold').value),
         breadthThreshold: Number(document.getElementById('sl_breadthThreshold').value),
-        breadthMultiplier: Number(document.getElementById('sl_breadthMultiplier').value),
-        penaltyDiscount: Number(document.getElementById('sl_penaltyDiscount').value)
+        breadthBonus: Number(document.getElementById('sl_breadthBonus').value),
+        penaltyPoints: Number(document.getElementById('sl_penaltyPoints').value)
       };
       
       try {
@@ -266,12 +264,41 @@
         results.forEach(data => {
           if (!data || !data.msgArray) return;
           data.msgArray.forEach(item => {
-            const prev = parsePrice(item.y);
-            let rawPrice = (item.z && item.z !== '-') ? item.z : (item.pz && item.pz !== '-') ? item.pz : item.y;
-            const price = parsePrice(rawPrice);
-            const vol = parseInt(item.v, 10) || 0;
+            const prev = parseFloat(item.y) || 0; 
+            let rawPrice = (item.z && item.z !== '-') ? item.z : (item.pz && item.pz !== '-') ? item.pz : null;
+            
+            // 🛡️ 完美防呆：用 a/b 掛單判斷漲跌停與量少冷門股
+            if (!rawPrice) {
+              const bestAsk = (item.a || '').split('_')[0]; 
+              const bestBid = (item.b || '').split('_')[0]; 
+              
+              if (bestBid && bestBid !== '-') {
+                rawPrice = bestBid; 
+              } else if (bestAsk && bestAsk !== '-') {
+                rawPrice = bestAsk; 
+              } else {
+                rawPrice = item.y;  
+              }
+            }
+            
+            let price = parseFloat((rawPrice || '').replace(/,/g, ''));
+            if (isNaN(price)) price = prev;
+            
+            // 🛡️ 今日高低點防護網：確保使用 a/b 算出的價格不會超出今日最高與最低限制
+            const high = parseFloat((item.h || '').replace(/,/g, ''));
+            const low = parseFloat((item.l || '').replace(/,/g, ''));
+            
+            // 只有在今日有成交（有高低點數值）的狀況下才進行限制
+            if (!isNaN(high) && high > 0 && price > high) {
+              price = high;
+            }
+            if (!isNaN(low) && low > 0 && price < low) {
+              price = low;
+            }
+            
+            const vol = parseInt((item.v || '').replace(/,/g, ''), 10) || 0;
 
-            if (!isNaN(price) && !isNaN(prev) && prev > 0) {
+            if (prev > 0) {
               const change = price - prev;
               const changePercent = (change / prev) * 100;
               latestQuotes[item.c] = { 
@@ -280,7 +307,7 @@
                 change: change,
                 changePercent: changePercent,
                 volume: vol,
-                turnover: price * vol // 簡易計算成交值
+                turnover: price * vol
               };
             }
           });
@@ -300,8 +327,8 @@
     function recalculateAndRender() {
       const vTh = Number(document.getElementById('sl_volThreshold').value);
       const bTh = Number(document.getElementById('sl_breadthThreshold').value);
-      const bMul = Number(document.getElementById('sl_breadthMultiplier').value);
-      const pDisc = Number(document.getElementById('sl_penaltyDiscount').value);
+      const bBonus = Number(document.getElementById('sl_breadthBonus').value);
+      const pPoints = Number(document.getElementById('sl_penaltyPoints').value);
 
       const sectorMap = {};
       Object.keys(allStocksList).forEach(code => {
@@ -343,17 +370,21 @@
         });
 
         let weightedPct = totalTurnover > 0 ? (totalWeightedPct / totalTurnover) : 0;
-        let finalScore = weightedPct;
+        let baseScore = 10 + weightedPct; 
+        let finalScore = baseScore;
+
         const upRatio = activeCount > 0 ? (upCount / activeCount) : 0;
-        let statusTag = "一般";
+        let statusTag = "平穩";
 
         if (upRatio >= (bTh / 100)) {
-          finalScore = finalScore > 0 ? finalScore * bMul : finalScore;
+          finalScore += bBonus;
           statusTag = "🔥 齊漲共振";
         } else if (downCount > upCount) {
-          finalScore = finalScore > 0 ? finalScore * pDisc : finalScore * (2 - pDisc);
+          finalScore -= pPoints;
           statusTag = "⚠️ 跌多漲少";
         }
+
+        finalScore = Math.max(0, Math.min(20, finalScore));
 
         return {
           name: cat.name,
@@ -362,7 +393,7 @@
           missingCount: missingCount,
           activeCount: activeCount,
           score: finalScore,
-          weightedPct: weightedPct,
+          weightedPct: weightedPct, 
           totalVolume: totalVolume,
           totalTurnover: totalTurnover,
           upCount: upCount,
@@ -382,9 +413,9 @@
       container.innerHTML = '';
 
       categories.forEach((cat, index) => {
-        const isUp = cat.score > 0, isDown = cat.score < 0;
+        const isUp = cat.score > 10.01, isDown = cat.score < 9.99;
         const colorClass = isUp ? 'is-up' : (isDown ? 'is-down' : 'is-flat');
-        const pctStr = (isUp ? '+' : '') + cat.score.toFixed(2) + '%';
+        const scoreStr = cat.score.toFixed(1);
         let rankClass = index === 0 ? 'rank-1' : (index === 1 ? 'rank-2' : (index === 2 ? 'rank-3' : ''));
 
         const sortedStocks = [...cat.stocks].sort((a, b) => {
@@ -398,11 +429,8 @@
           if (!stk.hasData) {
             stocksListHtml += `
               <div class="stock-row">
-                <div>
-                  <div class="stock-name" style="color:#ff9800;">${stk.code}</div>
-                  <div class="stock-code">無即時數據</div>
-                </div>
-                <div class="text-r"><span class="stock-price c-flat">-</span></div>
+                <div><div class="stock-name" style="color:#ff9800;">${stk.code}</div><div class="stock-code">無即時數據</div></div>
+                <div class="text-r"><span class="stock-price c-flat">--</span></div>
                 <div class="stock-change-box text-r c-flat"><div class="stock-change-pct">--</div></div>
                 <div class="text-r stock-vol">-</div>
               </div>
@@ -418,6 +446,7 @@
           let limitClass = '';
           if (stk.changePercent >= 9.5) limitClass = 'limit-up-solid';
           else if (stk.changePercent <= -9.5) limitClass = 'limit-down-solid';
+          const displayPrice = stk.price % 1 === 0 ? stk.price : stk.price.toFixed(2);
 
           stocksListHtml += `
             <div class="stock-row">
@@ -426,7 +455,7 @@
                 <div class="stock-code">${stk.code}</div>
               </div>
               <div class="text-r">
-                <span class="stock-price ${sColor} ${limitClass}">${stk.price % 1 === 0 ? stk.price : stk.price.toFixed(2)}</span>
+                <span class="stock-price ${sColor} ${limitClass}">${displayPrice}</span>
               </div>
               <div class="stock-change-box text-r ${sColor}">
                 <div class="stock-change-pct">${sPctStr}</div>
@@ -441,8 +470,9 @@
         const card = document.createElement('div');
         card.className = `cat-card ${isExpanded ? 'expanded' : ''}`;
         card.setAttribute('data-name', cat.name);
-        const turnoverYi = ((cat.totalTurnover || 0) / 100000).toFixed(1); // 簡易換算為億 (價格x千股)
-
+        const turnoverYi = ((cat.totalTurnover || 0) / 100000).toFixed(1); 
+        
+        const truePctStr = (cat.weightedPct > 0 ? '+' : '') + cat.weightedPct.toFixed(2) + '%';
         const warnBadge = cat.missingCount > 0 ? `<span class="tag-warn">無數據: ${cat.missingCount}</span>` : '';
 
         card.innerHTML = `
@@ -452,7 +482,7 @@
               <div>
                 <div class="cat-title">${cat.name}</div>
                 <div class="cat-subtitle">
-                  <span>總 ${cat.count} 檔 (${cat.upCount}漲 ${cat.downCount}跌)</span>
+                  <span>實漲 ${truePctStr}</span>
                   <span>•</span>
                   <span>估 ${turnoverYi} 億</span>
                   <span class="tag-status">${cat.statusTag}</span>
@@ -461,7 +491,7 @@
               </div>
             </div>
             <div class="cat-right">
-              <div class="pct-tag ${colorClass}">${pctStr}</div>
+              <div class="pct-tag ${colorClass}">${scoreStr}<span class="score-unit">/20分</span></div>
               <div class="chevron">▼</div>
             </div>
           </div>
@@ -488,7 +518,6 @@
       });
     }
 
-    // Modal 選單邏輯
     function openParamPanel() {
       document.getElementById('paramOverlay').classList.add('active');
     }
