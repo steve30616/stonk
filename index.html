@@ -15,7 +15,6 @@
     .refresh-btn { background: #387ed1; color: #ffffff; border: none; padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; }
     .refresh-btn:active { opacity: 0.8; }
 
-    /* 寬敞的類股標籤 */
     .sector-bar { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 16px; -webkit-overflow-scrolling: touch; }
     .sector-bar::-webkit-scrollbar { display: none; }
     .tab-btn { background: #222; color: #aaa; border: 1px solid #333; padding: 8px 16px; border-radius: 16px; font-size: 14px; white-space: nowrap; cursor: pointer; }
@@ -23,7 +22,6 @@
 
     .summary-bar { font-size: 13px; color: #888; margin-bottom: 12px; display: flex; justify-content: space-between; }
 
-    /* 復原的寬敞手機網格排版 */
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
     .card { background: #1e1e1e; border-radius: 8px; padding: 12px; border: 1px solid #2a2a2a; display: flex; flex-direction: column; justify-content: space-between; }
     .card-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
@@ -61,12 +59,16 @@
   <div id="stock-container" class="grid"></div>
 
   <script>
-    // 👇【請替換成你的 Firebase 資料庫網址】👇
+    // 👇【1. 替換成你的 Firebase 資料庫網址】👇
     const FIREBASE_URL = "https://stonk-aae09-default-rtdb.asia-southeast1.firebasedatabase.app";
+
+    // 👇【2. 替換成剛剛在 Google Cloud 複製的 Function URL】👇
+    const GCF_URL = "https://tw-stock-quotes-955770872872.asia-east1.run.app";
     
     let allStocksList = {};
     let latestQuotes = {};
     let currentSector = 'ALL';
+    let autoRefreshTimer = null;
 
     async function init() {
       try {
@@ -83,10 +85,28 @@
         renderCards(); 
 
         await fetchLiveQuotes();
+        startAutoRefresh();
       } catch (e) {
         document.getElementById('last-update').innerText = "名單載入失敗";
       }
     }
+
+    // 只有在網頁開著且在前景時，才每 60 秒抓價一次
+    function startAutoRefresh() {
+      if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+      autoRefreshTimer = setInterval(() => {
+        if (!document.hidden) {
+          fetchLiveQuotes();
+        }
+      }, 60000);
+    }
+
+    // 切回分頁時立即刷新
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) {
+        fetchLiveQuotes();
+      }
+    });
 
     function renderSectors(stocks) {
       const sectors = new Set();
@@ -115,42 +135,26 @@
 
     async function fetchLiveQuotes() {
       const statusEl = document.getElementById('last-update');
-      statusEl.innerText = "⚡ 現場抓價中...";
+      statusEl.innerText = "⚡ 正在現場抓價...";
       
       const codes = Object.keys(allStocksList);
       if (codes.length === 0) return;
 
-      const chunks = [];
-      for (let i = 0; i < codes.length; i += 20) {
-        const chunkCodes = codes.slice(i, i + 20);
-        const queryStr = chunkCodes.map(c => `${allStocksList[c].market || 'tse'}_${c}.tw`).join('|');
-        chunks.push(encodeURIComponent(queryStr));
-      }
+      const queryList = codes.map(c => `${allStocksList[c].market || 'tse'}_${c}.tw`).join('|');
 
       try {
-        // 改用更強的 corsproxy 代理伺服器繞過封鎖
-        const promises = chunks.map(chunk => {
-          const twseUrl = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=${chunk}&json=1&delay=0`;
-          const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(twseUrl)}`;
-          
-          return fetch(proxyUrl)
-            .then(r => r.json())
-            .catch(() => ({ msgArray: [] }));
-        });
+        const resp = await fetch(`${GCF_URL}?ex_ch=${encodeURIComponent(queryList)}`);
+        const data = await resp.json();
 
-        const results = await Promise.all(promises);
-        
-        results.forEach(res => {
-          (res.msgArray || []).forEach(item => {
-            const price = item.z;
-            const prev = item.y;
-            if (price && price !== '-' && prev && prev !== '-') {
-              latestQuotes[item.c] = {
-                price: parseFloat(price),
-                prev: parseFloat(prev)
-              };
-            }
-          });
+        (data.msgArray || []).forEach(item => {
+          const price = item.z;
+          const prev = item.y;
+          if (price && price !== '-' && prev && prev !== '-') {
+            latestQuotes[item.c] = {
+              price: parseFloat(price),
+              prev: parseFloat(prev)
+            };
+          }
         });
 
         const now = new Date();
