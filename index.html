@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>台股類股火力看板 (20分制)</title>
+  <title>台股類股排行榜</title>
   <style>
     :root {
       --bg: #0d0f12; --card-bg: #161920; --card-inner: #1c212b;
@@ -29,7 +29,7 @@
     /* 彈出式設定選單 (Modal) */
     .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 999; backdrop-filter: blur(3px); }
     .modal-overlay.active { display: flex; }
-    #paramPanel { background: var(--card-bg); border-radius: 16px; padding: 20px; width: 90%; max-width: 350px; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.8); animation: zoomIn 0.2s ease-out; }
+    #paramPanel { background: var(--card-bg); border-radius: 16px; padding: 20px; width: 90%; max-width: 350px; max-height: 85vh; overflow-y: auto; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.8); animation: zoomIn 0.2s ease-out; }
     @keyframes zoomIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
     
     .param-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid var(--border); padding-bottom: 12px;}
@@ -39,7 +39,7 @@
     .param-label-row { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-sub); }
     .param-val-badge { font-weight: 700; color: var(--accent); }
     .slider { width: 100%; accent-color: var(--accent); }
-    .param-btn-group { display: flex; gap: 10px; }
+    .param-btn-group { display: flex; gap: 10px; margin-top: 10px; }
     .btn-reset { flex: 1; background: #2a2e39; border: 1px solid var(--border); color: var(--text-main); padding: 10px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
     .btn-save-cloud { flex: 1; background: #1976d2; border: none; color: white; padding: 10px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
     
@@ -110,23 +110,31 @@
   <!-- 點擊背景可關閉的 Modal 選單 -->
   <div id="paramOverlay" class="modal-overlay" onclick="closeParamPanel(event)">
     <div id="paramPanel" onclick="event.stopPropagation()">
-      <div class="param-title-row"><div class="param-title">⚙️ 火力評估機制 (20分制)</div></div>
+      <div class="param-title-row"><div class="param-title">⚙️ 20分制進階火力策略</div></div>
       <div class="param-grid">
         <div class="param-item">
           <div class="param-label-row"><span>成交量低標門檻</span><span class="param-val-badge"><span id="lbl_volThreshold">300</span> 張</span></div>
           <input type="range" class="slider" id="sl_volThreshold" min="0" max="1500" step="50" value="300" oninput="onParamChange()">
         </div>
         <div class="param-item">
-          <div class="param-label-row"><span>齊漲廣度門檻</span><span class="param-val-badge"><span id="lbl_breadthThreshold">70</span> %</span></div>
-          <input type="range" class="slider" id="sl_breadthThreshold" min="50" max="90" step="5" value="70" oninput="onParamChange()">
+          <div class="param-label-row"><span>齊漲廣度門檻</span><span class="param-val-badge"><span id="lbl_upBreadthThreshold">65</span> %</span></div>
+          <input type="range" class="slider" id="sl_upBreadthThreshold" min="50" max="90" step="1" value="65" oninput="onParamChange()">
         </div>
         <div class="param-item">
-          <div class="param-label-row"><span>齊漲額外加分</span><span class="param-val-badge">+ <span id="lbl_breadthBonus">2.0</span> 分</span></div>
-          <input type="range" class="slider" id="sl_breadthBonus" min="0.0" max="5.0" step="0.5" value="2.0" oninput="onParamChange()">
+          <div class="param-label-row"><span>齊跌廣度門檻</span><span class="param-val-badge"><span id="lbl_downBreadthThreshold">60</span> %</span></div>
+          <input type="range" class="slider" id="sl_downBreadthThreshold" min="50" max="90" step="1" value="60" oninput="onParamChange()">
         </div>
         <div class="param-item">
-          <div class="param-label-row"><span>跌多漲少扣分</span><span class="param-val-badge">- <span id="lbl_penaltyPoints">1.5</span> 分</span></div>
-          <input type="range" class="slider" id="sl_penaltyPoints" min="0.0" max="5.0" step="0.5" value="1.5" oninput="onParamChange()">
+          <div class="param-label-row"><span>齊漲共振加分</span><span class="param-val-badge">+ <span id="lbl_upBonus">1.5</span> 分</span></div>
+          <input type="range" class="slider" id="sl_upBonus" min="0.0" max="5.0" step="0.5" value="1.5" oninput="onParamChange()">
+        </div>
+        <div class="param-item">
+          <div class="param-label-row"><span>齊跌殺盤重扣</span><span class="param-val-badge">- <span id="lbl_downPenalty">1.5</span> 分</span></div>
+          <input type="range" class="slider" id="sl_downPenalty" min="0.0" max="5.0" step="0.5" value="1.5" oninput="onParamChange()">
+        </div>
+        <div class="param-item">
+          <div class="param-label-row"><span>跌多漲少微扣</span><span class="param-val-badge">- <span id="lbl_minorPenalty">0.5</span> 分</span></div>
+          <input type="range" class="slider" id="sl_minorPenalty" min="0.0" max="3.0" step="0.1" value="0.5" oninput="onParamChange()">
         </div>
       </div>
       <div class="param-btn-group">
@@ -155,9 +163,11 @@
 
     const DEFAULT_PARAMS = {
       volThreshold: 300,
-      breadthThreshold: 70,
-      breadthBonus: 2.0,      
-      penaltyPoints: 1.5      
+      upBreadthThreshold: 65,      // 齊漲廣度
+      downBreadthThreshold: 60,    // 齊跌廣度
+      upBonus: 1.5,                // 齊漲加分
+      downPenalty: 1.5,            // 齊跌殺盤重扣
+      minorPenalty: 0.5            // 跌多漲少微扣
     };
 
     let userSettings = { ...DEFAULT_PARAMS };
@@ -192,19 +202,30 @@
     function initParamControls(p) {
       document.getElementById('sl_volThreshold').value = p.volThreshold;
       document.getElementById('lbl_volThreshold').innerText = p.volThreshold;
-      document.getElementById('sl_breadthThreshold').value = p.breadthThreshold;
-      document.getElementById('lbl_breadthThreshold').innerText = p.breadthThreshold;
-      document.getElementById('sl_breadthBonus').value = p.breadthBonus;
-      document.getElementById('lbl_breadthBonus').innerText = parseFloat(p.breadthBonus).toFixed(1);
-      document.getElementById('sl_penaltyPoints').value = p.penaltyPoints;
-      document.getElementById('lbl_penaltyPoints').innerText = parseFloat(p.penaltyPoints).toFixed(1);
+      
+      document.getElementById('sl_upBreadthThreshold').value = p.upBreadthThreshold;
+      document.getElementById('lbl_upBreadthThreshold').innerText = p.upBreadthThreshold;
+      
+      document.getElementById('sl_downBreadthThreshold').value = p.downBreadthThreshold;
+      document.getElementById('lbl_downBreadthThreshold').innerText = p.downBreadthThreshold;
+      
+      document.getElementById('sl_upBonus').value = p.upBonus;
+      document.getElementById('lbl_upBonus').innerText = parseFloat(p.upBonus).toFixed(1);
+      
+      document.getElementById('sl_downPenalty').value = p.downPenalty;
+      document.getElementById('lbl_downPenalty').innerText = parseFloat(p.downPenalty).toFixed(1);
+      
+      document.getElementById('sl_minorPenalty').value = p.minorPenalty;
+      document.getElementById('lbl_minorPenalty').innerText = parseFloat(p.minorPenalty).toFixed(1);
     }
 
     function onParamChange() {
       document.getElementById('lbl_volThreshold').innerText = document.getElementById('sl_volThreshold').value;
-      document.getElementById('lbl_breadthThreshold').innerText = document.getElementById('sl_breadthThreshold').value;
-      document.getElementById('lbl_breadthBonus').innerText = parseFloat(document.getElementById('sl_breadthBonus').value).toFixed(1);
-      document.getElementById('lbl_penaltyPoints').innerText = parseFloat(document.getElementById('sl_penaltyPoints').value).toFixed(1);
+      document.getElementById('lbl_upBreadthThreshold').innerText = document.getElementById('sl_upBreadthThreshold').value;
+      document.getElementById('lbl_downBreadthThreshold').innerText = document.getElementById('sl_downBreadthThreshold').value;
+      document.getElementById('lbl_upBonus').innerText = parseFloat(document.getElementById('sl_upBonus').value).toFixed(1);
+      document.getElementById('lbl_downPenalty').innerText = parseFloat(document.getElementById('sl_downPenalty').value).toFixed(1);
+      document.getElementById('lbl_minorPenalty').innerText = parseFloat(document.getElementById('sl_minorPenalty').value).toFixed(1);
       recalculateAndRender();
     }
 
@@ -216,9 +237,11 @@
     async function saveToCloud() {
       userSettings = {
         volThreshold: Number(document.getElementById('sl_volThreshold').value),
-        breadthThreshold: Number(document.getElementById('sl_breadthThreshold').value),
-        breadthBonus: Number(document.getElementById('sl_breadthBonus').value),
-        penaltyPoints: Number(document.getElementById('sl_penaltyPoints').value)
+        upBreadthThreshold: Number(document.getElementById('sl_upBreadthThreshold').value),
+        downBreadthThreshold: Number(document.getElementById('sl_downBreadthThreshold').value),
+        upBonus: Number(document.getElementById('sl_upBonus').value),
+        downPenalty: Number(document.getElementById('sl_downPenalty').value),
+        minorPenalty: Number(document.getElementById('sl_minorPenalty').value)
       };
       
       try {
@@ -319,9 +342,11 @@
 
     function recalculateAndRender() {
       const vTh = Number(document.getElementById('sl_volThreshold').value);
-      const bTh = Number(document.getElementById('sl_breadthThreshold').value);
-      const bBonus = Number(document.getElementById('sl_breadthBonus').value);
-      const pPoints = Number(document.getElementById('sl_penaltyPoints').value);
+      const upBTh = Number(document.getElementById('sl_upBreadthThreshold').value);
+      const downBTh = Number(document.getElementById('sl_downBreadthThreshold').value);
+      const uBonus = Number(document.getElementById('sl_upBonus').value);
+      const dPenalty = Number(document.getElementById('sl_downPenalty').value);
+      const mPenalty = Number(document.getElementById('sl_minorPenalty').value);
 
       const sectorMap = {};
       Object.keys(allStocksList).forEach(code => {
@@ -368,13 +393,18 @@
         let finalScore = baseScore;
 
         const upRatio = activeCount > 0 ? (upCount / activeCount) : 0;
+        const downRatio = activeCount > 0 ? (downCount / activeCount) : 0;
         let statusTag = "平穩";
 
-        if (upRatio >= (bTh / 100)) {
-          finalScore += bBonus;
+        // 三段式火力判定
+        if (upRatio >= (upBTh / 100)) {
+          finalScore += uBonus;
           statusTag = "🔥 齊漲共振";
+        } else if (downRatio >= (downBTh / 100)) {
+          finalScore -= dPenalty;
+          statusTag = "🧊 齊跌殺盤";
         } else if (downCount > upCount) {
-          finalScore -= pPoints;
+          finalScore -= mPenalty;
           statusTag = "⚠️ 跌多漲少";
         }
 
@@ -383,7 +413,7 @@
         return {
           name: cat.name,
           count: cat.stocks.length,
-          validCount: validCount, // 有抓到資料的檔數
+          validCount: validCount, 
           missingCount: missingCount,
           activeCount: activeCount,
           score: finalScore,
@@ -408,11 +438,10 @@
       container.innerHTML = '';
 
       categories.forEach((cat, index) => {
-        // 取得顏色狀態與文字字串
+        // 取得顏色狀態與文字字串 (以實漲跌幅為顏色標準)
         const isUp = cat.weightedPct > 0.001, isDown = cat.weightedPct < -0.001;
         const colorClass = isUp ? 'is-up' : (isDown ? 'is-down' : 'is-flat');
         
-        // 分數與漲跌幅
         const scoreStr = cat.score.toFixed(1);
         const truePctStr = (cat.weightedPct > 0 ? '+' : '') + cat.weightedPct.toFixed(2) + '%';
         
