@@ -58,15 +58,13 @@
     .rank-3 { background: linear-gradient(135deg, #FDBA74 0%, #B45309 100%); color: #431407; box-shadow: 0 2px 8px rgba(180,83,9,0.4); }
     
     .cat-title { font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 2px; }
-    .cat-subtitle { font-size: 12px; color: var(--text-sub); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 2px; }
+    .cat-subtitle { font-size: 12px; color: var(--text-sub); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 2px; line-height: 1.4;}
     .tag-status { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: #2a2e39; color: #90caf9; }
     .tag-warn { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: var(--warn-bg); color: var(--warn); }
     .cat-right { display: flex; align-items: center; gap: 8px; }
     
-    /* 20分制分數標籤 */
-    .pct-tag { min-width: 65px; text-align: center; padding: 6px 8px; border-radius: 8px; font-size: 16px; font-weight: 800; display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
-    .score-unit { font-size: 9px; font-weight: 600; opacity: 0.8; margin-top: 1px; }
-    
+    /* 漲跌幅標籤 */
+    .pct-tag { min-width: 75px; text-align: center; padding: 6px 10px; border-radius: 8px; font-size: 16px; font-weight: 800; }
     .is-up { color: var(--up); background: var(--up-bg); border: 1px solid rgba(255, 59, 48, 0.2); }
     .is-down { color: var(--down); background: var(--down-bg); border: 1px solid rgba(52, 199, 89, 0.2); }
     .is-flat { color: var(--flat); background: var(--flat-bg); border: 1px solid rgba(139, 148, 158, 0.2); }
@@ -109,6 +107,7 @@
     </div>
   </header>
 
+  <!-- 點擊背景可關閉的 Modal 選單 -->
   <div id="paramOverlay" class="modal-overlay" onclick="closeParamPanel(event)">
     <div id="paramPanel" onclick="event.stopPropagation()">
       <div class="param-title-row"><div class="param-title">⚙️ 火力評估機制 (20分制)</div></div>
@@ -284,17 +283,11 @@
             let price = parseFloat((rawPrice || '').replace(/,/g, ''));
             if (isNaN(price)) price = prev;
             
-            // 🛡️ 今日高低點防護網：確保使用 a/b 算出的價格不會超出今日最高與最低限制
+            // 🛡️ 今日高低點防護網
             const high = parseFloat((item.h || '').replace(/,/g, ''));
             const low = parseFloat((item.l || '').replace(/,/g, ''));
-            
-            // 只有在今日有成交（有高低點數值）的狀況下才進行限制
-            if (!isNaN(high) && high > 0 && price > high) {
-              price = high;
-            }
-            if (!isNaN(low) && low > 0 && price < low) {
-              price = low;
-            }
+            if (!isNaN(high) && high > 0 && price > high) price = high;
+            if (!isNaN(low) && low > 0 && price < low) price = low;
             
             const vol = parseInt((item.v || '').replace(/,/g, ''), 10) || 0;
 
@@ -369,6 +362,7 @@
           validCount++;
         });
 
+        // 🌟 20分制核心運算邏輯
         let weightedPct = totalTurnover > 0 ? (totalWeightedPct / totalTurnover) : 0;
         let baseScore = 10 + weightedPct; 
         let finalScore = baseScore;
@@ -389,7 +383,7 @@
         return {
           name: cat.name,
           count: cat.stocks.length,
-          validCount: validCount,
+          validCount: validCount, // 有抓到資料的檔數
           missingCount: missingCount,
           activeCount: activeCount,
           score: finalScore,
@@ -403,6 +397,7 @@
         };
       });
 
+      // 依 20分制 總分排行 (由高到低)
       calculated.sort((a, b) => b.score - a.score);
       renderCards(calculated);
     }
@@ -413,9 +408,17 @@
       container.innerHTML = '';
 
       categories.forEach((cat, index) => {
-        const isUp = cat.score > 10.01, isDown = cat.score < 9.99;
+        // 取得顏色狀態與文字字串
+        const isUp = cat.weightedPct > 0.001, isDown = cat.weightedPct < -0.001;
         const colorClass = isUp ? 'is-up' : (isDown ? 'is-down' : 'is-flat');
+        
+        // 分數與漲跌幅
         const scoreStr = cat.score.toFixed(1);
+        const truePctStr = (cat.weightedPct > 0 ? '+' : '') + cat.weightedPct.toFixed(2) + '%';
+        
+        // 幾漲幾跌幾平計算 (只計算有效資料)
+        const flatCount = cat.validCount - cat.upCount - cat.downCount;
+
         let rankClass = index === 0 ? 'rank-1' : (index === 1 ? 'rank-2' : (index === 2 ? 'rank-3' : ''));
 
         const sortedStocks = [...cat.stocks].sort((a, b) => {
@@ -472,7 +475,6 @@
         card.setAttribute('data-name', cat.name);
         const turnoverYi = ((cat.totalTurnover || 0) / 100000).toFixed(1); 
         
-        const truePctStr = (cat.weightedPct > 0 ? '+' : '') + cat.weightedPct.toFixed(2) + '%';
         const warnBadge = cat.missingCount > 0 ? `<span class="tag-warn">無數據: ${cat.missingCount}</span>` : '';
 
         card.innerHTML = `
@@ -482,7 +484,9 @@
               <div>
                 <div class="cat-title">${cat.name}</div>
                 <div class="cat-subtitle">
-                  <span>實漲 ${truePctStr}</span>
+                  <span style="color:var(--accent); font-weight:700;">🎯 火力 ${scoreStr} 分</span>
+                  <span>•</span>
+                  <span>${cat.upCount}漲 ${cat.downCount}跌 ${flatCount}平</span>
                   <span>•</span>
                   <span>估 ${turnoverYi} 億</span>
                   <span class="tag-status">${cat.statusTag}</span>
@@ -491,7 +495,7 @@
               </div>
             </div>
             <div class="cat-right">
-              <div class="pct-tag ${colorClass}">${scoreStr}<span class="score-unit">/20分</span></div>
+              <div class="pct-tag ${colorClass}">${truePctStr}</div>
               <div class="chevron">▼</div>
             </div>
           </div>
