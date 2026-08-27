@@ -2,158 +2,144 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>台股強弱榜 & 齊漲齊跌看板</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>台股類股即時強弱看板</title>
   <style>
     :root {
-      --bg: #0b0e14;
-      --card-bg: #151924;
-      --text-main: #f0f3f6;
-      --text-sub: #8b949e;
-      --up-color: #ff4d4f;   
-      --down-color: #00e676; 
-      --up-bg: rgba(255, 77, 79, 0.15);
-      --down-bg: rgba(0, 230, 118, 0.15);
-      --border: #21262d;
+      --bg: #0d0f12; --card-bg: #161920; --card-inner: #1c212b;
+      --border: rgba(255, 255, 255, 0.08); --border-focus: rgba(255, 255, 255, 0.2);
+      --text-main: #f0f2f5; --text-sub: #8b949e; --text-muted: #57606a;
+      --up: #ff3b30; --up-bg: rgba(255, 59, 48, 0.12);
+      --down: #34c759; --down-bg: rgba(52, 199, 89, 0.12);
+      --flat: #8b949e; --flat-bg: rgba(139, 148, 158, 0.1);
+      --warn: #ff9800; --warn-bg: rgba(255, 152, 0, 0.15);
+      --accent: #2979ff; --accent-glow: rgba(41, 121, 255, 0.35);
     }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang TC", "Noto Sans TC", sans-serif; }
+    body { background-color: var(--bg); color: var(--text-main); padding-bottom: calc(env(safe-area-inset-bottom) + 30px); -webkit-tap-highlight-color: transparent; }
+    header { position: sticky; top: 0; z-index: 100; background: rgba(13, 15, 18, 0.88); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); padding: calc(env(safe-area-inset-top) + 12px) 16px 12px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .brand-box { display: flex; align-items: center; gap: 8px; }
+    .brand-title { font-size: 18px; font-weight: 700; color: #fff; letter-spacing: -0.4px; }
+    .brand-dot { width: 8px; height: 8px; border-radius: 50%; background: #34c759; box-shadow: 0 0 8px #34c759; }
+    .header-actions { display: flex; align-items: center; gap: 8px; }
+    .btn-icon { background: var(--card-inner); border: 1px solid var(--border); color: var(--text-main); padding: 6px 10px; border-radius: 16px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+    .btn-refresh { background: linear-gradient(135deg, #2979ff, #1565c0); border: none; color: #fff; padding: 6px 14px; border-radius: 16px; font-size: 12px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px var(--accent-glow); }
+    .btn-refresh:active { transform: scale(0.95); }
     
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background-color: var(--bg); color: var(--text-main); padding: 16px 12px 40px 12px; -webkit-font-smoothing: antialiased; }
-    
-    /* 頂部導航列 */
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-    .header h1 { font-size: 20px; font-weight: 800; letter-spacing: 1px; margin: 0; display: flex; align-items: center; gap: 8px; }
-    .status-box { display: flex; align-items: center; gap: 8px; }
-    .status { font-size: 11px; color: var(--text-sub); }
-    .btn { background: #2f81f7; color: #fff; border: none; padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
-    .btn-icon { background: transparent; border: 1px solid var(--border); padding: 6px 10px; font-size: 14px; border-radius: 8px; }
-    .btn:active { transform: scale(0.95); }
-
-    /* 類股標籤列 (支援首項固定) */
-    .sector-bar { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 4px; scroll-behavior: smooth; position: relative; }
-    .sector-bar::-webkit-scrollbar { display: none; }
-    
-    .tab-btn { background: transparent; color: var(--text-sub); border: 1px solid var(--border); padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 500; white-space: nowrap; cursor: pointer; transition: 0.2s; }
-    .tab-btn.active { background: #2f81f7; color: #ffffff; border-color: #2f81f7; font-weight: 700; }
-    
-    /* 首頁標籤固定在左側 */
-    .sticky-tab { position: sticky; left: 0; z-index: 10; box-shadow: 4px 0 10px var(--bg); }
-    .sticky-tab:not(.active) { background-color: #161b22; color: #fff; }
-
-    /* 統計列 */
-    .summary-bar { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-sub); margin-bottom: 12px; padding: 0 4px; }
-    
-    /* 單欄卡片列表 */
-    .list-container { display: flex; flex-direction: column; gap: 10px; }
-    
-    /* 單一橫向卡片設計 */
-    .card { background: var(--card-bg); border-radius: 12px; padding: 12px 14px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; cursor: pointer; position: relative; overflow: hidden; }
-    
-    .card-left { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
-    
-    /* 🥇 金銀銅名次徽章設計 */
-    .rank-badge { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; font-size: 14px; font-weight: 900; flex-shrink: 0; }
-    .rank-1 { background: linear-gradient(135deg, #FBE18D 0%, #D89F3C 100%); color: #5C3A00; box-shadow: 0 2px 8px rgba(216,159,60,0.5); }
-    .rank-2 { background: linear-gradient(135deg, #E2E8F0 0%, #94A3B8 100%); color: #1E293B; box-shadow: 0 2px 8px rgba(148,163,184,0.5); }
-    .rank-3 { background: linear-gradient(135deg, #FDBA74 0%, #B45309 100%); color: #431407; box-shadow: 0 2px 8px rgba(180,83,9,0.5); }
-    .rank-other { background: transparent; color: #4b5563; font-style: italic; font-size: 15px; }
-
-    /* 資訊區塊 */
-    .info-box { display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
-    .s-name, .name { font-size: 16px; font-weight: 800; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .s-stat, .symbol { font-size: 11px; color: var(--text-sub); }
-    
-    /* 齊漲齊跌標籤 */
-    .co-movement { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 2px; }
-    .co-up { color: var(--up-color); background: var(--up-bg); border: 1px solid rgba(255, 77, 79, 0.3); }
-    .co-down { color: var(--down-color); background: var(--down-bg); border: 1px solid rgba(0, 230, 118, 0.3); }
-    .co-flat { color: var(--text-sub); background: rgba(255,255,255,0.05); }
-
-    /* 價格與漲跌幅 (右側) */
-    .card-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-    .price, .s-pct { font-size: 18px; font-weight: 800; }
-    .change-pill { font-size: 12px; font-weight: 700; padding: 3px 6px; border-radius: 6px; display: inline-block; }
-
-    /* 顏色狀態 */
-    .up .price, .up .s-pct { color: var(--up-color); }
-    .up .change-pill { color: var(--up-color); background: var(--up-bg); }
-    .down .price, .down .s-pct { color: var(--down-color); }
-    .down .change-pill { color: var(--down-color); background: var(--down-bg); }
-    .equal .price, .equal .s-pct { color: var(--text-sub); }
-    .equal .change-pill { color: var(--text-sub); background: rgba(255,255,255,0.05); }
-
-    .pulse { animation: pulse 1.5s infinite; }
-    @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
-    #error-log { color: var(--up-color); font-size: 12px; margin-top: 10px; text-align: center; }
-
-    /* --- 設定選單 (Modal) --- */
-    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 100; backdrop-filter: blur(3px); }
+    /* 彈出式設定選單 (Modal) */
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 999; backdrop-filter: blur(3px); }
     .modal-overlay.active { display: flex; }
-    .modal-content { background: #161b22; border: 1px solid var(--border); border-radius: 16px; padding: 24px; width: 90%; max-width: 320px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-    .modal-content h2 { margin-bottom: 20px; font-size: 18px; text-align: center; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+    #paramPanel { background: var(--card-bg); border-radius: 16px; padding: 20px; width: 90%; max-width: 350px; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.8); animation: zoomIn 0.2s ease-out; }
+    @keyframes zoomIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
     
-    .setting-group { margin-bottom: 20px; }
-    .setting-group label { display: block; font-size: 14px; margin-bottom: 8px; font-weight: 600; color: var(--text-sub); }
-    .setting-hint { font-size: 11px; color: #58a6ff; margin-bottom: 6px; display: block; }
-    .setting-group input, .setting-group select { width: 100%; background: #0d1117; border: 1px solid var(--border); color: #fff; padding: 10px; border-radius: 8px; font-size: 16px; outline: none; }
+    .param-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .param-title { font-size: 15px; font-weight: 700; color: #fff; }
+    .param-grid { display: grid; grid-template-columns: 1fr; gap: 14px; margin-bottom: 14px; }
+    .param-item { display: flex; flex-direction: column; gap: 6px; }
+    .param-label-row { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-sub); }
+    .param-val-badge { font-weight: 700; color: var(--accent); }
+    .slider { width: 100%; accent-color: var(--accent); }
+    .param-btn-group { display: flex; gap: 10px; }
+    .btn-reset { flex: 1; background: #2a2e39; border: 1px solid var(--border); color: var(--text-main); padding: 8px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .btn-save-cloud { flex: 1; background: #1976d2; border: none; color: white; padding: 8px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
     
-    .modal-actions { display: flex; gap: 10px; margin-top: 10px; }
-    .modal-actions button { flex: 1; padding: 10px; border-radius: 8px; font-weight: 600; cursor: pointer; border: none; font-size: 14px; }
-    .btn-save { background: #238636; color: #fff; }
-    .btn-save:active { background: #2ea043; }
-    .btn-reset { background: transparent; border: 1px solid var(--border) !important; color: var(--text-sub); }
+    .container { padding: 14px 16px; max-width: 650px; margin: 0 auto; }
+    .status-summary { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-sub); margin-bottom: 12px; padding: 0 2px; }
+    
+    /* 類股卡片 */
+    .cat-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; margin-bottom: 12px; overflow: hidden; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 4px 12px rgba(0,0,0,0.25); }
+    .cat-card.expanded { border-color: var(--border-focus); }
+    .cat-header { padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+    .cat-left { display: flex; align-items: center; gap: 12px; }
+    
+    .rank-badge { width: 26px; height: 26px; border-radius: 8px; background: var(--card-inner); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: var(--text-sub); flex-shrink: 0; }
+    .rank-1 { background: linear-gradient(135deg, #ffb300, #ff6f00); color: #000; }
+    .rank-2 { background: linear-gradient(135deg, #cfd8dc, #90a4ae); color: #000; }
+    .rank-3 { background: linear-gradient(135deg, #ff8a65, #d84315); color: #000; }
+    
+    .cat-title { font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 2px; }
+    .cat-subtitle { font-size: 12px; color: var(--text-sub); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 2px; }
+    .tag-status { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: #2a2e39; color: #90caf9; }
+    .tag-warn { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: var(--warn-bg); color: var(--warn); }
+    .cat-right { display: flex; align-items: center; gap: 10px; }
+    
+    .pct-tag { min-width: 78px; text-align: right; padding: 6px 10px; border-radius: 8px; font-size: 15px; font-weight: 700; }
+    .is-up { color: var(--up); background: var(--up-bg); }
+    .is-down { color: var(--down); background: var(--down-bg); }
+    .is-flat { color: var(--flat); background: var(--flat-bg); }
+    .chevron { font-size: 11px; color: var(--text-muted); transition: transform 0.25s; }
+    .cat-card.expanded .chevron { transform: rotate(180deg); }
+    
+    /* 展開明細 */
+    .stock-detail-container { display: none; background: var(--card-inner); border-top: 1px solid var(--border); padding: 10px 16px 14px 16px; }
+    .cat-card.expanded .stock-detail-container { display: block; }
+    .detail-head { display: grid; grid-template-columns: 1.3fr 1fr 1.2fr 0.9fr; font-size: 11px; color: var(--text-muted); padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.06); margin-bottom: 4px; }
+    .stock-row { display: grid; grid-template-columns: 1.3fr 1fr 1.2fr 0.9fr; padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.04); align-items: center; font-size: 14px; }
+    .stock-row:last-child { border-bottom: none; }
+    .stock-name { font-weight: 600; color: #fff; line-height: 1.2; }
+    .stock-code { font-size: 11px; color: var(--text-sub); margin-top: 1px; }
+    .text-r { text-align: right; }
+    
+    .c-up { color: var(--up); }
+    .c-down { color: var(--down); }
+    .c-flat { color: var(--flat); }
+    
+    .stock-price { font-weight: 700; font-size: 14px; padding: 2px 6px; border-radius: 4px; display: inline-block; transition: all 0.2s; }
+    .limit-up-solid { background-color: var(--up) !important; color: #ffffff !important; font-weight: 900 !important; box-shadow: 0 0 10px rgba(255, 59, 48, 0.6); border-radius: 4px; }
+    .limit-down-solid { background-color: var(--down) !important; color: #ffffff !important; font-weight: 900 !important; box-shadow: 0 0 10px rgba(52, 199, 89, 0.6); border-radius: 4px; }
+    .stock-change-box { display: flex; flex-direction: column; align-items: flex-end; }
+    .stock-change-pct { font-size: 14px; font-weight: 700; line-height: 1.2; }
+    .stock-change-amt { font-size: 11px; font-weight: 500; opacity: 0.9; margin-top: 1px; }
+    .stock-vol { font-size: 12px; color: var(--text-sub); }
   </style>
 </head>
 <body>
+  <header>
+    <div class="brand-box">
+      <div class="brand-dot"></div>
+      <div class="brand-title">類股即時強弱</div>
+    </div>
+    <div class="header-actions">
+      <button class="btn-icon" onclick="openParamPanel()">⚙️ 參數</button>
+      <button class="btn-refresh" onclick="manualRefresh()">手動刷新</button>
+    </div>
+  </header>
 
-  <div class="header">
-    <h1>🏆 綜合強弱榜</h1>
-    <div class="status-box">
-      <span id="last-update" class="status">載入中...</span>
-      <button class="btn" onclick="fetchLiveQuotes()">刷新</button>
-      <button class="btn btn-icon" onclick="openSettings()">⚙️</button>
+  <!-- 點擊背景可關閉的 Modal 選單 -->
+  <div id="paramOverlay" class="modal-overlay" onclick="closeParamPanel(event)">
+    <div id="paramPanel" onclick="event.stopPropagation()">
+      <div class="param-title-row"><div class="param-title">⚙️ 動態強度參數微調</div></div>
+      <div class="param-grid">
+        <div class="param-item">
+          <div class="param-label-row"><span>成交量低標門檻</span><span class="param-val-badge"><span id="lbl_volThreshold">300</span> 張</span></div>
+          <input type="range" class="slider" id="sl_volThreshold" min="0" max="1500" step="50" value="300" oninput="onParamChange()">
+        </div>
+        <div class="param-item">
+          <div class="param-label-row"><span>齊漲廣度門檻</span><span class="param-val-badge"><span id="lbl_breadthThreshold">70</span> %</span></div>
+          <input type="range" class="slider" id="sl_breadthThreshold" min="50" max="90" step="5" value="70" oninput="onParamChange()">
+        </div>
+        <div class="param-item">
+          <div class="param-label-row"><span>齊漲加成倍數</span><span class="param-val-badge"><span id="lbl_breadthMultiplier">1.2</span> x</span></div>
+          <input type="range" class="slider" id="sl_breadthMultiplier" min="1.0" max="1.8" step="0.05" value="1.2" oninput="onParamChange()">
+        </div>
+        <div class="param-item">
+          <div class="param-label-row"><span>假強勢懲罰折扣</span><span class="param-val-badge"><span id="lbl_penaltyDiscount">0.7</span> x</span></div>
+          <input type="range" class="slider" id="sl_penaltyDiscount" min="0.5" max="1.0" step="0.05" value="0.7" oninput="onParamChange()">
+        </div>
+      </div>
+      <div class="param-btn-group">
+        <button class="btn-reset" onclick="resetToDefaults()">🔄 恢復預設值</button>
+        <button class="btn-save-cloud" onclick="saveToCloud()">💾 存為預設設定</button>
+      </div>
     </div>
   </div>
 
-  <!-- 標籤列 (最左邊固定) -->
-  <div id="sector-bar" class="sector-bar">
-    <button class="tab-btn sticky-tab active" onclick="setSector('RANKING')">👑 綜合強弱</button>
-    <!-- 其他族群會動態加在這裡，並可以往右滑動 -->
-  </div>
-
-  <div class="summary-bar">
-    <span id="sector-stat">分析中...</span>
-    <span id="sector-adv-dec">-</span>
-  </div>
-
-  <div id="stock-container" class="list-container"></div>
-  <div id="error-log"></div>
-
-  <!-- 設定選單 Modal (點擊外部自動關閉) -->
-  <div id="settings-modal" class="modal-overlay" onclick="closeSettings(event)">
-    <div class="modal-content" onclick="event.stopPropagation()">
-      <h2>⚙️ 策略參數設定</h2>
-      
-      <div class="setting-group">
-        <label>懲罰機制 (過度下跌扣分)</label>
-        <span class="setting-hint">若族群下跌家數大於上漲，分數額外扣減</span>
-        <select id="input-punish">
-          <option value="true">開啟 (嚴格排行)</option>
-          <option value="false">關閉 (原始分數)</option>
-        </select>
-      </div>
-      
-      <div class="setting-group">
-        <label>族群分數額外加成 (%)</label>
-        <span class="setting-hint">套用至所有族群的基礎分數加成</span>
-        <input type="number" id="input-bonus" placeholder="預設: 0" step="0.1">
-      </div>
-
-      <div class="modal-actions">
-        <button class="btn-reset" onclick="resetSettings()">恢復預設</button>
-        <button class="btn-save" onclick="saveSettings()">💾 儲存</button>
-      </div>
+  <div class="container">
+    <div class="status-summary">
+      <span id="updateTime">等待手動刷新...</span>
+      <span id="totalStats">-- 族群</span>
     </div>
+    <div id="categoryContainer"></div>
   </div>
 
   <script>
@@ -165,18 +151,18 @@
     const GCF_URL = "https://tw-stock-quotes-955770872872.asia-east1.run.app";
     // ==========================================
 
-    // 預設設定值
-    const DEFAULT_SETTINGS = {
-      punishmentEnabled: true, // 預設開啟懲罰機制
-      scoreBonus: 0            // 預設 0 加成
+    const DEFAULT_PARAMS = {
+      volThreshold: 300,
+      breadthThreshold: 70,
+      breadthMultiplier: 1.2,
+      penaltyDiscount: 0.7
     };
-    
-    let userSettings = { ...DEFAULT_SETTINGS };
+
+    let userSettings = { ...DEFAULT_PARAMS };
     let allStocksList = {};
     let latestQuotes = {};
-    let sectorStats = {}; 
-    let currentSector = 'RANKING'; 
-    let autoRefreshTimer = null;
+    const expandedSet = new Set();
+    let isFetching = false;
 
     const parsePrice = (val) => {
       if (!val || val === '-') return NaN;
@@ -192,47 +178,51 @@
 
         const listData = await listResp.json();
         let settingsData = null;
-        if (settingsResp && settingsResp.ok) {
-          settingsData = await settingsResp.json();
-        }
+        if (settingsResp && settingsResp.ok) settingsData = await settingsResp.json();
         
-        if (!listData || !listData.stocks) throw new Error("Firebase 無股票名單");
+        if (!listData || !listData.stocks) throw new Error("Firebase 無資料");
         allStocksList = listData.stocks;
         
-        if (settingsData) userSettings = { ...DEFAULT_SETTINGS, ...settingsData };
+        if (settingsData) userSettings = { ...DEFAULT_PARAMS, ...settingsData };
+        initParamControls(userSettings);
         
-        renderSectors();
-        renderCards(); 
-
         await fetchLiveQuotes();
-        
-        // 預設背景 60 秒刷新
-        if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-        autoRefreshTimer = setInterval(() => {
-          if (!document.hidden) fetchLiveQuotes();
-        }, 60000);
-
       } catch (e) {
-        showError(e.message);
+        document.getElementById('updateTime').innerText = `連線錯誤: ${e.message}`;
       }
     }
 
-    // --- 設定選單邏輯 ---
-    function openSettings() {
-      document.getElementById('input-punish').value = userSettings.punishmentEnabled.toString();
-      document.getElementById('input-bonus').value = userSettings.scoreBonus;
-      document.getElementById('settings-modal').classList.add('active');
+    function initParamControls(p) {
+      document.getElementById('sl_volThreshold').value = p.volThreshold;
+      document.getElementById('lbl_volThreshold').innerText = p.volThreshold;
+      document.getElementById('sl_breadthThreshold').value = p.breadthThreshold;
+      document.getElementById('lbl_breadthThreshold').innerText = p.breadthThreshold;
+      document.getElementById('sl_breadthMultiplier').value = p.breadthMultiplier;
+      document.getElementById('lbl_breadthMultiplier').innerText = p.breadthMultiplier;
+      document.getElementById('sl_penaltyDiscount').value = p.penaltyDiscount;
+      document.getElementById('lbl_penaltyDiscount').innerText = p.penaltyDiscount;
     }
 
-    function closeSettings(e) {
-      document.getElementById('settings-modal').classList.remove('active');
+    function onParamChange() {
+      document.getElementById('lbl_volThreshold').innerText = document.getElementById('sl_volThreshold').value;
+      document.getElementById('lbl_breadthThreshold').innerText = document.getElementById('sl_breadthThreshold').value;
+      document.getElementById('lbl_breadthMultiplier').innerText = document.getElementById('sl_breadthMultiplier').value;
+      document.getElementById('lbl_penaltyDiscount').innerText = document.getElementById('sl_penaltyDiscount').value;
+      recalculateAndRender();
     }
 
-    async function saveSettings() {
-      const punish = document.getElementById('input-punish').value === 'true';
-      const bonus = parseFloat(document.getElementById('input-bonus').value) || 0;
-      
-      userSettings = { punishmentEnabled: punish, scoreBonus: bonus };
+    function resetToDefaults() {
+      initParamControls(DEFAULT_PARAMS);
+      onParamChange();
+    }
+
+    async function saveToCloud() {
+      userSettings = {
+        volThreshold: Number(document.getElementById('sl_volThreshold').value),
+        breadthThreshold: Number(document.getElementById('sl_breadthThreshold').value),
+        breadthMultiplier: Number(document.getElementById('sl_breadthMultiplier').value),
+        penaltyDiscount: Number(document.getElementById('sl_penaltyDiscount').value)
+      };
       
       try {
         await fetch(`${FIREBASE_URL}/settings.json`, {
@@ -240,41 +230,20 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(userSettings)
         });
-      } catch(e) {
-        console.log("寫入 Firebase 設定失敗", e);
-      }
-
-      document.getElementById('settings-modal').classList.remove('active');
-      calculateSectorStats(); // 重新計算包含懲罰與加成的分數
-      renderSectors();        // 重新排版籤列
-      renderCards();          // 重新排版卡片
+      } catch(e) {}
+      
+      closeParamPanel();
+      recalculateAndRender();
     }
 
-    async function resetSettings() {
-      userSettings = { ...DEFAULT_SETTINGS };
-      document.getElementById('input-punish').value = userSettings.punishmentEnabled.toString();
-      document.getElementById('input-bonus').value = userSettings.scoreBonus;
-    }
-
-    document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) fetchLiveQuotes();
-    });
-
-    function showError(msg) {
-      document.getElementById('last-update').innerText = "發生錯誤";
-      document.getElementById('error-log').innerText = msg;
-    }
-
-    function setSector(sec) {
-      currentSector = sec;
-      renderSectors(); 
-      renderCards();
+    function manualRefresh() {
+      if (isFetching) return;
+      fetchLiveQuotes();
     }
 
     async function fetchLiveQuotes() {
-      const statusEl = document.getElementById('last-update');
-      document.getElementById('error-log').innerText = ''; 
-      statusEl.innerText = "抓取中...";
+      isFetching = true;
+      document.getElementById('updateTime').innerText = "連線抓取中...";
       
       const codes = Object.keys(allStocksList);
       if (codes.length === 0) return;
@@ -288,7 +257,7 @@
       try {
         const promises = chunks.map(async (chunk) => {
           const res = await fetch(`${GCF_URL}?ex_ch=${encodeURIComponent(chunk)}`);
-          if (!res.ok) throw new Error(`${res.status}`);
+          if (!res.ok) throw new Error(`連線代碼 ${res.status}`);
           return res.json();
         });
 
@@ -300,222 +269,239 @@
             const prev = parsePrice(item.y);
             let rawPrice = (item.z && item.z !== '-') ? item.z : (item.pz && item.pz !== '-') ? item.pz : item.y;
             const price = parsePrice(rawPrice);
+            const vol = parseInt(item.v, 10) || 0;
 
             if (!isNaN(price) && !isNaN(prev) && prev > 0) {
-              latestQuotes[item.c] = { price: price, prev: prev };
+              const change = price - prev;
+              const changePercent = (change / prev) * 100;
+              latestQuotes[item.c] = { 
+                price: price, 
+                prev: prev,
+                change: change,
+                changePercent: changePercent,
+                volume: vol,
+                turnover: price * vol // 簡易計算成交值
+              };
             }
           });
         });
 
-        calculateSectorStats(); 
-        renderSectors();        
-        renderCards();          
-
         const now = new Date();
-        statusEl.innerText = `${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}`;
+        document.getElementById('updateTime').innerText = `🕒 最後更新 ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}`;
+        
+        recalculateAndRender();
       } catch (e) {
-        showError(`失敗: ${e.message}`);
+        document.getElementById('updateTime').innerText = `抓取失敗`;
+      } finally {
+        isFetching = false;
       }
     }
 
-    function calculateSectorStats() {
-      sectorStats = {};
+    function recalculateAndRender() {
+      const vTh = Number(document.getElementById('sl_volThreshold').value);
+      const bTh = Number(document.getElementById('sl_breadthThreshold').value);
+      const bMul = Number(document.getElementById('sl_breadthMultiplier').value);
+      const pDisc = Number(document.getElementById('sl_penaltyDiscount').value);
+
+      const sectorMap = {};
       Object.keys(allStocksList).forEach(code => {
         const stock = allStocksList[code];
-        const quote = latestQuotes[code];
-        if (!quote) return;
-        
-        const diff = quote.price - quote.prev;
-        const pct = (diff / quote.prev) * 100;
-
         (stock.sectors || []).forEach(sec => {
-          if (!sectorStats[sec]) {
-            sectorStats[sec] = { sumPct: 0, count: 0, up: 0, down: 0 };
-          }
-          sectorStats[sec].sumPct += pct;
-          sectorStats[sec].count++;
-          if (diff > 0.0001) sectorStats[sec].up++;
-          else if (diff < -0.0001) sectorStats[sec].down++;
+          if (!sectorMap[sec]) sectorMap[sec] = { name: sec, stocks: [] };
+          
+          const q = latestQuotes[code];
+          sectorMap[sec].stocks.push({
+            code: code,
+            name: stock.name || code,
+            hasData: !!q,
+            price: q ? q.price : 0,
+            change: q ? q.change : 0,
+            changePercent: q ? q.changePercent : 0,
+            volume: q ? q.volume : 0,
+            turnover: q ? q.turnover : 0
+          });
         });
       });
 
-      // 結算並套用策略：分數加成 & 懲罰機制
-      Object.keys(sectorStats).forEach(sec => {
-        let baseAvg = sectorStats[sec].sumPct / sectorStats[sec].count;
-        
-        // 1. 套用全域分數加成
-        baseAvg += (userSettings.scoreBonus || 0);
+      const rawCategoryData = Object.values(sectorMap);
 
-        // 2. 套用懲罰機制 (若下跌家數大於上漲，分數扣減 1.5%)
-        if (userSettings.punishmentEnabled) {
-          if (sectorStats[sec].down > sectorStats[sec].up) {
-            baseAvg -= 1.5; 
+      const calculated = rawCategoryData.map(cat => {
+        let totalWeightedPct = 0, totalTurnover = 0, totalVolume = 0;
+        let validCount = 0, upCount = 0, downCount = 0, activeCount = 0, missingCount = 0;
+
+        cat.stocks.forEach(stk => {
+          if (!stk.hasData) { missingCount++; return; }
+          totalVolume += stk.volume;
+          totalTurnover += stk.turnover;
+          if (stk.volume >= vTh) {
+            activeCount++;
+            totalWeightedPct += stk.changePercent * (stk.turnover > 0 ? stk.turnover : 1);
+            if (stk.change > 0) upCount++;
+            if (stk.change < 0) downCount++;
           }
+          validCount++;
+        });
+
+        let weightedPct = totalTurnover > 0 ? (totalWeightedPct / totalTurnover) : 0;
+        let finalScore = weightedPct;
+        const upRatio = activeCount > 0 ? (upCount / activeCount) : 0;
+        let statusTag = "一般";
+
+        if (upRatio >= (bTh / 100)) {
+          finalScore = finalScore > 0 ? finalScore * bMul : finalScore;
+          statusTag = "🔥 齊漲共振";
+        } else if (downCount > upCount) {
+          finalScore = finalScore > 0 ? finalScore * pDisc : finalScore * (2 - pDisc);
+          statusTag = "⚠️ 跌多漲少";
         }
-        
-        sectorStats[sec].avgPct = baseAvg;
+
+        return {
+          name: cat.name,
+          count: cat.stocks.length,
+          validCount: validCount,
+          missingCount: missingCount,
+          activeCount: activeCount,
+          score: finalScore,
+          weightedPct: weightedPct,
+          totalVolume: totalVolume,
+          totalTurnover: totalTurnover,
+          upCount: upCount,
+          downCount: downCount,
+          statusTag: statusTag,
+          stocks: cat.stocks
+        };
       });
+
+      calculated.sort((a, b) => b.score - a.score);
+      renderCards(calculated);
     }
 
-    function renderSectors() {
-      const bar = document.getElementById('sector-bar');
-      // 確保「綜合強弱」永遠釘選在最左側
-      bar.innerHTML = `<button class="tab-btn sticky-tab ${currentSector === 'RANKING' ? 'active' : ''}" onclick="setSector('RANKING')">👑 綜合強弱</button>`;
-      
-      const sortedSectors = Object.keys(sectorStats).sort((a, b) => sectorStats[b].avgPct - sectorStats[a].avgPct);
-      
-      if (sortedSectors.length === 0) {
-        const tempSectors = new Set();
-        Object.values(allStocksList).forEach(s => {
-          if (s.sectors) s.sectors.forEach(sec => tempSectors.add(sec));
-        });
-        tempSectors.forEach(sec => {
-          bar.innerHTML += `<button class="tab-btn ${currentSector === sec ? 'active' : ''}" onclick="setSector('${sec}')">${sec}</button>`;
-        });
-        return;
-      }
-
-      sortedSectors.forEach(sec => {
-        const avg = sectorStats[sec].avgPct;
-        const sign = avg > 0 ? '+' : '';
-        const btnText = `${sec} ${sign}${avg.toFixed(1)}%`;
-        bar.innerHTML += `<button class="tab-btn ${currentSector === sec ? 'active' : ''}" onclick="setSector('${sec}')">${btnText}</button>`;
-      });
-    }
-
-    // 產生名次徽章 (金銀銅)
-    function getRankHtml(index) {
-      if (index === 0) return `<div class="rank-badge rank-1">1</div>`;
-      if (index === 1) return `<div class="rank-badge rank-2">2</div>`;
-      if (index === 2) return `<div class="rank-badge rank-3">3</div>`;
-      return `<div class="rank-badge rank-other">${index + 1}</div>`;
-    }
-
-    function renderCards() {
-      const container = document.getElementById('stock-container');
+    function renderCards(categories) {
+      document.getElementById('totalStats').innerText = `共 ${categories.length} 個類股族群`;
+      const container = document.getElementById('categoryContainer');
       container.innerHTML = '';
 
-      if (currentSector === 'RANKING') renderRankingBoard(container);
-      else renderStockList(container);
-    }
+      categories.forEach((cat, index) => {
+        const isUp = cat.score > 0, isDown = cat.score < 0;
+        const colorClass = isUp ? 'is-up' : (isDown ? 'is-down' : 'is-flat');
+        const pctStr = (isUp ? '+' : '') + cat.score.toFixed(2) + '%';
+        let rankClass = index === 0 ? 'rank-1' : (index === 1 ? 'rank-2' : (index === 2 ? 'rank-3' : ''));
 
-    // 【單欄渲染：類股強弱】
-    function renderRankingBoard(container) {
-      document.querySelector('.header h1').innerHTML = "🏆 綜合強弱榜";
-      const sortedSectors = Object.keys(sectorStats).sort((a, b) => sectorStats[b].avgPct - sectorStats[a].avgPct);
-      
-      if (sortedSectors.length === 0) return;
+        const sortedStocks = [...cat.stocks].sort((a, b) => {
+          if (!a.hasData && b.hasData) return 1;
+          if (a.hasData && !b.hasData) return -1;
+          return (b.changePercent || 0) - (a.changePercent || 0);
+        });
 
-      let totalUp = 0, totalDown = 0;
+        let stocksListHtml = '';
+        sortedStocks.forEach(stk => {
+          if (!stk.hasData) {
+            stocksListHtml += `
+              <div class="stock-row">
+                <div>
+                  <div class="stock-name" style="color:#ff9800;">${stk.code}</div>
+                  <div class="stock-code">無即時數據</div>
+                </div>
+                <div class="text-r"><span class="stock-price c-flat">-</span></div>
+                <div class="stock-change-box text-r c-flat"><div class="stock-change-pct">--</div></div>
+                <div class="text-r stock-vol">-</div>
+              </div>
+            `;
+            return;
+          }
 
-      sortedSectors.forEach((sec, index) => {
-        const stat = sectorStats[sec];
-        totalUp += stat.up;
-        totalDown += stat.down;
-        
-        let stateClass = 'equal', sign = '';
-        if (stat.avgPct > 0.01) { stateClass = 'up'; sign = '+'; }
-        else if (stat.avgPct < -0.01) { stateClass = 'down'; }
+          const sUp = stk.change > 0, sDown = stk.change < 0;
+          const sColor = sUp ? 'c-up' : (sDown ? 'c-down' : 'c-flat');
+          const sPctStr = (sUp ? '+' : '') + stk.changePercent.toFixed(2) + '%';
+          const sAmtStr = (sUp ? '+' : '') + stk.change.toFixed(2);
 
-        // 計算齊漲齊跌火力
-        let coHtml = '';
-        if (stat.count > 0) {
-          const upRate = Math.round((stat.up / stat.count) * 100);
-          const downRate = Math.round((stat.down / stat.count) * 100);
-          if (upRate >= 50) coHtml = `<span class="co-movement co-up">🔥 齊漲率 ${upRate}%</span>`;
-          else if (downRate >= 50) coHtml = `<span class="co-movement co-down">🧊 齊跌率 ${downRate}%</span>`;
-          else coHtml = `<span class="co-movement co-flat">波動分散</span>`;
-        }
+          let limitClass = '';
+          if (stk.changePercent >= 9.5) limitClass = 'limit-up-solid';
+          else if (stk.changePercent <= -9.5) limitClass = 'limit-down-solid';
 
-        const rankHtml = getRankHtml(index);
+          stocksListHtml += `
+            <div class="stock-row">
+              <div>
+                <div class="stock-name">${stk.name}</div>
+                <div class="stock-code">${stk.code}</div>
+              </div>
+              <div class="text-r">
+                <span class="stock-price ${sColor} ${limitClass}">${stk.price % 1 === 0 ? stk.price : stk.price.toFixed(2)}</span>
+              </div>
+              <div class="stock-change-box text-r ${sColor}">
+                <div class="stock-change-pct">${sPctStr}</div>
+                <div class="stock-change-amt">${sAmtStr}</div>
+              </div>
+              <div class="text-r stock-vol">${stk.volume.toLocaleString()}</div>
+            </div>
+          `;
+        });
 
+        const isExpanded = expandedSet.has(cat.name);
         const card = document.createElement('div');
-        card.className = `card ${stateClass}`;
-        card.onclick = () => setSector(sec);
-        
+        card.className = `cat-card ${isExpanded ? 'expanded' : ''}`;
+        card.setAttribute('data-name', cat.name);
+        const turnoverYi = ((cat.totalTurnover || 0) / 100000).toFixed(1); // 簡易換算為億 (價格x千股)
+
+        const warnBadge = cat.missingCount > 0 ? `<span class="tag-warn">無數據: ${cat.missingCount}</span>` : '';
+
         card.innerHTML = `
-          <div class="card-left">
-            ${rankHtml}
-            <div class="info-box">
-              <div class="s-name">${sec}</div>
-              <div class="s-stat">漲 ${stat.up} / 跌 ${stat.down} / 平 ${stat.count - stat.up - stat.down}</div>
-              ${coHtml}
+          <div class="cat-header" onclick="toggleCard('${cat.name}')">
+            <div class="cat-left">
+              <div class="rank-badge ${rankClass}">${index + 1}</div>
+              <div>
+                <div class="cat-title">${cat.name}</div>
+                <div class="cat-subtitle">
+                  <span>總 ${cat.count} 檔 (${cat.upCount}漲 ${cat.downCount}跌)</span>
+                  <span>•</span>
+                  <span>估 ${turnoverYi} 億</span>
+                  <span class="tag-status">${cat.statusTag}</span>
+                  ${warnBadge}
+                </div>
+              </div>
+            </div>
+            <div class="cat-right">
+              <div class="pct-tag ${colorClass}">${pctStr}</div>
+              <div class="chevron">▼</div>
             </div>
           </div>
-          <div class="card-right">
-            <div class="s-pct">${sign}${stat.avgPct.toFixed(2)}%</div>
+          <div class="stock-detail-container">
+            <div class="detail-head">
+              <div>個股名稱</div>
+              <div class="text-r">成交價</div>
+              <div class="text-r">漲跌幅 / 額</div>
+              <div class="text-r">成交量(張)</div>
+            </div>
+            ${stocksListHtml}
           </div>
         `;
         container.appendChild(card);
       });
-
-      document.getElementById('sector-stat').innerText = `共 ${sortedSectors.length} 個族群`;
-      document.getElementById('sector-adv-dec').innerHTML = `<span style="color:var(--up-color);">▲ ${totalUp}</span> / <span style="color:var(--down-color);">▼ ${totalDown}</span>`;
     }
 
-    // 【單欄渲染：個股清單】
-    function renderStockList(container) {
-      document.querySelector('.header h1').innerHTML = `🔥 ${currentSector}`;
-      let targetCodes = Object.keys(allStocksList).filter(code => (allStocksList[code].sectors || []).includes(currentSector));
-
-      targetCodes.sort((a, b) => {
-        const qA = latestQuotes[a], qB = latestQuotes[b];
-        const pctA = qA ? (qA.price - qA.prev) / qA.prev : -999;
-        const pctB = qB ? (qB.price - qB.prev) / qB.prev : -999;
-        return pctB - pctA;
+    function toggleCard(categoryName) {
+      if (expandedSet.has(categoryName)) expandedSet.delete(categoryName);
+      else expandedSet.add(categoryName);
+      const cards = document.querySelectorAll('.cat-card');
+      cards.forEach(card => {
+        if (card.getAttribute('data-name') === categoryName) card.classList.toggle('expanded');
       });
-
-      let upCount = 0, downCount = 0;
-
-      targetCodes.forEach((code, index) => {
-        const stock = allStocksList[code];
-        const quote = latestQuotes[code];
-        const card = document.createElement('div');
-        
-        const rankHtml = getRankHtml(index);
-
-        if (quote) {
-          const diff = quote.price - quote.prev;
-          const pct = ((diff / quote.prev) * 100).toFixed(2);
-          let stateClass = 'equal', sign = '';
-          
-          if (diff > 0.0001) { stateClass = 'up'; sign = '+'; upCount++; }
-          else if (diff < -0.0001) { stateClass = 'down'; downCount++; }
-
-          card.className = `card ${stateClass}`;
-          const displayPrice = quote.price % 1 === 0 ? quote.price : quote.price.toFixed(2);
-
-          card.innerHTML = `
-            <div class="card-left">
-              ${rankHtml}
-              <div class="info-box">
-                <div class="name">${stock.name || code}</div>
-                <div class="symbol">${code}</div>
-              </div>
-            </div>
-            <div class="card-right">
-              <div class="price">${displayPrice}</div>
-              <div class="change-pill">${sign}${pct}%</div>
-            </div>
-          `;
-        } else {
-          card.className = 'card equal pulse';
-          card.innerHTML = `
-            <div class="card-left">
-              ${rankHtml}
-              <div class="info-box"><div class="name">${stock.name || code}</div><div class="symbol">${code}</div></div>
-            </div>
-            <div class="card-right"><div class="price">--</div><div class="change-pill">讀取中</div></div>
-          `;
-        }
-        container.appendChild(card);
-      });
-
-      document.getElementById('sector-stat').innerText = `共 ${targetCodes.length} 檔`;
-      document.getElementById('sector-adv-dec').innerHTML = `<span style="color:var(--up-color);">▲ ${upCount}</span> / <span style="color:var(--down-color);">▼ ${downCount}</span>`;
     }
 
-    init();
+    // Modal 選單邏輯
+    function openParamPanel() {
+      document.getElementById('paramOverlay').classList.add('active');
+    }
+
+    function closeParamPanel(event) {
+      if (!event || event.target.id === 'paramOverlay') {
+        document.getElementById('paramOverlay').classList.remove('active');
+      }
+    }
+
+    window.onload = function() {
+      init();
+    };
   </script>
 </body>
 </html>
