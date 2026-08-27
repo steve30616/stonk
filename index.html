@@ -23,7 +23,7 @@
     .summary-bar { font-size: 13px; color: #888; margin-bottom: 12px; display: flex; justify-content: space-between; }
 
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
-    .card { background: #1e1e1e; border-radius: 8px; padding: 12px; border: 1px solid #2a2a2a; display: flex; flex-direction: column; justify-content: space-between; }
+    .card { background: #1e1e1e; border-radius: 8px; padding: 12px; border: 1px solid #2a2a2a; display: flex; flex-direction: column; justify-content: space-between; min-height: 90px; }
     .card-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
     .name { font-size: 15px; font-weight: bold; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80px; }
     .symbol { font-size: 12px; color: #888; }
@@ -91,7 +91,6 @@
       }
     }
 
-    // 只有在網頁開著且在前景時，才每 60 秒抓價一次
     function startAutoRefresh() {
       if (autoRefreshTimer) clearInterval(autoRefreshTimer);
       autoRefreshTimer = setInterval(() => {
@@ -101,7 +100,6 @@
       }, 60000);
     }
 
-    // 切回分頁時立即刷新
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) {
         fetchLiveQuotes();
@@ -135,26 +133,47 @@
 
     async function fetchLiveQuotes() {
       const statusEl = document.getElementById('last-update');
-      statusEl.innerText = "⚡ 正在現場抓價...";
+      statusEl.innerText = "⚡ 現場抓價中...";
       
       const codes = Object.keys(allStocksList);
       if (codes.length === 0) return;
 
-      const queryList = codes.map(c => `${allStocksList[c].market || 'tse'}_${c}.tw`).join('|');
+      // 前端每 80 檔切成一組，避免單次 GET URL 過長
+      const chunks = [];
+      for (let i = 0; i < codes.length; i += 80) {
+        const sliceCodes = codes.slice(i, i + 80);
+        const queryStr = sliceCodes.map(c => `${allStocksList[c].market || 'tse'}_${c}.tw`).join('|');
+        chunks.push(queryStr);
+      }
 
       try {
-        const resp = await fetch(`${GCF_URL}?ex_ch=${encodeURIComponent(queryList)}`);
-        const data = await resp.json();
+        const promises = chunks.map(chunk => 
+          fetch(`${GCF_URL}?ex_ch=${encodeURIComponent(chunk)}`)
+            .then(res => res.json())
+            .catch(() => ({ msgArray: [] }))
+        );
 
-        (data.msgArray || []).forEach(item => {
-          const price = item.z;
-          const prev = item.y;
-          if (price && price !== '-' && prev && prev !== '-') {
-            latestQuotes[item.c] = {
-              price: parseFloat(price),
-              prev: parseFloat(prev)
-            };
-          }
+        const results = await Promise.all(promises);
+
+        results.forEach(data => {
+          (data.msgArray || []).forEach(item => {
+            const prev = parseFloat(item.y);
+            // 優先順序：成交價(z) -> 盤前試撮價(pz) -> 昨收價(y)
+            let rawPrice = item.z;
+            if (!rawPrice || rawPrice === '-') {
+              rawPrice = item.pz && item.pz !== '-' ? item.pz : item.y;
+            }
+            
+            const price = parseFloat(rawPrice);
+
+            if (!isNaN(price) && !isNaN(prev) && prev > 0) {
+              latestQuotes[item.c] = {
+                price: price,
+                prev: prev,
+                isMatch: (item.z && item.z !== '-') // 是否為盤中實際成交
+              };
+            }
+          });
         });
 
         const now = new Date();
@@ -175,6 +194,7 @@
         targetCodes = targetCodes.filter(code => (allStocksList[code].sectors || []).includes(currentSector));
       }
 
+      // 依漲跌幅由大到小排序
       targetCodes.sort((a, b) => {
         const qA = latestQuotes[a];
         const qB = latestQuotes[b];
@@ -198,11 +218,11 @@
           let colorClass = 'equal';
           let sign = '';
           
-          if (diff > 0) { 
+          if (diff > 0.0001) { 
             colorClass = 'up'; 
             sign = '+'; 
             upCount++;
-          } else if (diff < 0) { 
+          } else if (diff < -0.0001) { 
             colorClass = 'down'; 
             downCount++;
           }
@@ -222,7 +242,7 @@
               <span class="symbol">${code}</span>
             </div>
             <div class="price equal pulse">--</div>
-            <div class="change equal">讀取中</div>
+            <div class="change equal">載入中</div>
           `;
         }
         container.appendChild(card);
