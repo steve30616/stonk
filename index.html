@@ -3,15 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>台股即時強弱看板 (Pro版)</title>
+  <title>台股類股強弱看板</title>
   <style>
     :root {
       --bg: #0b0e14;
       --card-bg: #151924;
       --text-main: #f0f3f6;
       --text-sub: #8b949e;
-      --up-color: #ff4d4f;   /* 台股漲(紅) */
-      --down-color: #00e676; /* 台股跌(綠) */
+      --up-color: #ff4d4f;   
+      --down-color: #00e676; 
       --up-bg: rgba(255, 77, 79, 0.15);
       --down-bg: rgba(0, 230, 118, 0.15);
       --border: #21262d;
@@ -22,71 +22,76 @@
     
     /* 頂部導航列 */
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-    .header h1 { font-size: 22px; font-weight: 800; letter-spacing: 1px; margin: 0; }
+    .header h1 { font-size: 20px; font-weight: 800; letter-spacing: 1px; margin: 0; }
     .status-box { display: flex; align-items: center; gap: 10px; }
-    .status { font-size: 12px; color: var(--text-sub); background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 4px; }
-    .refresh-btn { background: #2f81f7; color: #fff; border: none; padding: 6px 14px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(47, 129, 247, 0.2); }
+    .status { font-size: 11px; color: var(--text-sub); background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 4px; }
+    .refresh-btn { background: #2f81f7; color: #fff; border: none; padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
     .refresh-btn:active { transform: scale(0.95); }
 
-    /* 類股標籤列 (隱藏捲軸) */
-    .sector-bar { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 12px; scroll-behavior: smooth; }
+    /* 類股標籤列 */
+    .sector-bar { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 12px; scroll-behavior: smooth; }
     .sector-bar::-webkit-scrollbar { display: none; }
-    .tab-btn { background: transparent; color: var(--text-sub); border: 1px solid var(--border); padding: 8px 18px; border-radius: 20px; font-size: 14px; font-weight: 500; white-space: nowrap; cursor: pointer; transition: 0.2s; }
+    .tab-btn { background: transparent; color: var(--text-sub); border: 1px solid var(--border); padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 500; white-space: nowrap; cursor: pointer; transition: 0.2s; }
     .tab-btn.active { background: #2f81f7; color: #ffffff; border-color: #2f81f7; font-weight: 700; }
 
     /* 統計列 */
-    .summary-bar { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-sub); margin-bottom: 16px; padding: 0 4px; }
+    .summary-bar { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-sub); margin-bottom: 16px; padding: 0 4px; }
     .summary-bar span strong { color: var(--text-main); font-weight: 600; }
 
-    /* 雙欄大卡片網格 (手機端完美 2 欄) */
+    /* 雙欄卡片網格 */
     .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
     
-    /* 卡片設計 */
-    .card { background: var(--card-bg); border-radius: 12px; padding: 14px; border: 1px solid var(--border); display: flex; flex-direction: column; justify-content: space-between; min-height: 100px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
+    /* 卡片共用設計 */
+    .card { background: var(--card-bg); border-radius: 12px; padding: 14px; border: 1px solid var(--border); display: flex; flex-direction: column; justify-content: space-between; min-height: 95px; cursor: pointer; position: relative; overflow: hidden; }
+    
+    /* 類股排行專用卡片 */
+    .sector-card .s-name { font-size: 18px; font-weight: 800; color: var(--text-main); margin-bottom: 4px; }
+    .sector-card .s-stat { font-size: 11px; color: var(--text-sub); }
+    .sector-card .s-pct { font-size: 22px; font-weight: 800; margin-top: 8px; text-align: right; }
+
+    /* 個股專用卡片 */
     .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
     .name-box { display: flex; flex-direction: column; gap: 2px; }
-    .name { font-size: 16px; font-weight: 700; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90px; }
-    .symbol { font-size: 12px; color: var(--text-sub); font-weight: 500; }
-    
+    .name { font-size: 15px; font-weight: 700; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90px; }
+    .symbol { font-size: 11px; color: var(--text-sub); font-weight: 500; }
     .card-bottom { display: flex; justify-content: space-between; align-items: flex-end; }
-    .price { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+    .price { font-size: 20px; font-weight: 800; }
+    .change-pill { font-size: 12px; font-weight: 700; padding: 4px 6px; border-radius: 6px; display: inline-block; }
     
-    /* 漲跌幅膠囊 */
-    .change-pill { font-size: 13px; font-weight: 700; padding: 4px 8px; border-radius: 6px; display: inline-block; }
-    
-    .up .price { color: var(--up-color); }
+    /* 漲跌顏色 */
+    .up .price, .up .s-pct { color: var(--up-color); }
     .up .change-pill { color: var(--up-color); background: var(--up-bg); }
-    
-    .down .price { color: var(--down-color); }
+    .down .price, .down .s-pct { color: var(--down-color); }
     .down .change-pill { color: var(--down-color); background: var(--down-bg); }
-    
-    .equal .price { color: var(--text-sub); }
+    .equal .price, .equal .s-pct { color: var(--text-sub); }
     .equal .change-pill { color: var(--text-sub); background: rgba(255,255,255,0.05); }
 
-    /* 動態效果 */
+    /* 頂部裝飾線 (強弱視覺) */
+    .border-up { border-top: 3px solid var(--up-color); }
+    .border-down { border-top: 3px solid var(--down-color); }
+    .border-equal { border-top: 3px solid var(--text-sub); }
+
     .pulse { animation: pulse 1.5s infinite; }
     @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
-    
-    /* 錯誤訊息提示 */
     #error-log { color: var(--up-color); font-size: 12px; margin-top: 10px; text-align: center; }
   </style>
 </head>
 <body>
 
   <div class="header">
-    <h1>即時戰報</h1>
+    <h1>🏆 類股強弱榜</h1>
     <div class="status-box">
-      <span id="last-update" class="status">初始化中...</span>
-      <button class="refresh-btn" onclick="fetchLiveQuotes()">刷新</button>
+      <span id="last-update" class="status">載入中...</span>
+      <button class="refresh-btn" onclick="fetchLiveQuotes()">現場刷新</button>
     </div>
   </div>
 
   <div id="sector-bar" class="sector-bar">
-    <button class="tab-btn active" onclick="filterSector('ALL')">全部標的</button>
+    <button class="tab-btn active" onclick="setSector('RANKING')">👑 強弱排行</button>
   </div>
 
   <div class="summary-bar">
-    <span id="sector-stat">載入中...</span>
+    <span id="sector-stat">分析中...</span>
     <span id="sector-adv-dec">-</span>
   </div>
 
@@ -95,19 +100,19 @@
 
   <script>
     // ==========================================
-    // 👇 1. 請替換成你的 Firebase 資料庫網址 👇
+    // 👇 1. 替換成你的 Firebase 資料庫網址 👇
     const FIREBASE_URL = "https://stonk-aae09-default-rtdb.asia-southeast1.firebasedatabase.app";
 
-    // 👇 2. 請替換成你的 Google Cloud Function 網址 👇
+    // 👇 2. 替換成你的 Google Cloud Function 網址 👇
     const GCF_URL = "https://tw-stock-quotes-955770872872.asia-east1.run.app";
     // ==========================================
 
     let allStocksList = {};
     let latestQuotes = {};
-    let currentSector = 'ALL';
+    let sectorStats = {}; // 儲存各類股平均漲跌幅
+    let currentSector = 'RANKING'; 
     let autoRefreshTimer = null;
 
-    // 清理數字字串 (解決千元股如 "1,050.00" 的解析問題)
     const parsePrice = (val) => {
       if (!val || val === '-') return NaN;
       return parseFloat(val.toString().replace(/,/g, ''));
@@ -118,29 +123,24 @@
         const resp = await fetch(`${FIREBASE_URL}/stock_list.json`);
         const data = await resp.json();
         
-        if (!data || !data.stocks) {
-          showError("找不到名單，請確認 Firebase 是否已同步！");
-          return;
-        }
-
+        if (!data || !data.stocks) throw new Error("Firebase 無資料");
         allStocksList = data.stocks;
-        renderSectors(allStocksList);
-        renderCards(); // 先畫出骨架
+        
+        renderSectors();
+        renderCards(); // 先畫骨架
 
         await fetchLiveQuotes();
         
-        // 啟動 60 秒定時刷新
         if (autoRefreshTimer) clearInterval(autoRefreshTimer);
         autoRefreshTimer = setInterval(() => {
           if (!document.hidden) fetchLiveQuotes();
         }, 60000);
 
       } catch (e) {
-        showError(`清單載入失敗: ${e.message}`);
+        showError(e.message);
       }
     }
 
-    // 網頁切回前景時立刻補刷
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) fetchLiveQuotes();
     });
@@ -150,40 +150,20 @@
       document.getElementById('error-log').innerText = msg;
     }
 
-    function renderSectors(stocks) {
-      const sectors = new Set();
-      Object.values(stocks).forEach(s => {
-        if (s.sectors) s.sectors.forEach(sec => sectors.add(sec));
-      });
-      
-      const bar = document.getElementById('sector-bar');
-      bar.innerHTML = `<button class="tab-btn active" onclick="filterSector('ALL')">全部標的</button>`;
-      sectors.forEach(sec => {
-        const btn = document.createElement('button');
-        btn.className = 'tab-btn';
-        btn.innerText = sec;
-        btn.onclick = () => filterSector(sec);
-        bar.appendChild(btn);
-      });
-    }
-
-    function filterSector(sec) {
+    function setSector(sec) {
       currentSector = sec;
-      document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.innerText === (sec === 'ALL' ? '全部標的' : sec));
-      });
+      renderSectors(); 
       renderCards();
     }
 
     async function fetchLiveQuotes() {
       const statusEl = document.getElementById('last-update');
-      document.getElementById('error-log').innerText = ''; // 清除舊錯誤
+      document.getElementById('error-log').innerText = ''; 
       statusEl.innerText = "連線抓取中...";
       
       const codes = Object.keys(allStocksList);
       if (codes.length === 0) return;
 
-      // 嚴格限制每次請求最多 40 檔，避免 URL 過長被 Server 拒絕
       const chunks = [];
       for (let i = 0; i < codes.length; i += 40) {
         const sliceCodes = codes.slice(i, i + 40);
@@ -202,44 +182,142 @@
 
         results.forEach(data => {
           if (!data || !data.msgArray) return;
-          
           data.msgArray.forEach(item => {
             const prev = parsePrice(item.y);
-            
-            // 優先順序：盤中成交價(z) -> 盤前試撮價(pz) -> 昨收價(y)
-            let rawPrice = (item.z && item.z !== '-') ? item.z : 
-                           (item.pz && item.pz !== '-') ? item.pz : item.y;
-                           
+            let rawPrice = (item.z && item.z !== '-') ? item.z : (item.pz && item.pz !== '-') ? item.pz : item.y;
             const price = parsePrice(rawPrice);
 
             if (!isNaN(price) && !isNaN(prev) && prev > 0) {
-              latestQuotes[item.c] = {
-                price: price,
-                prev: prev
-              };
+              latestQuotes[item.c] = { price: price, prev: prev };
             }
           });
         });
 
+        calculateSectorStats(); // 計算類股平均
+        renderSectors();        // 更新導航列排序
+        renderCards();          // 更新畫面卡片
+
         const now = new Date();
         statusEl.innerText = `${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}`;
       } catch (e) {
-        showError(`價格抓取失敗: ${e.message}`);
+        showError(`抓取失敗: ${e.message}`);
+      }
+    }
+
+    // 計算各類股的平均漲跌幅與漲跌家數
+    function calculateSectorStats() {
+      sectorStats = {};
+      Object.keys(allStocksList).forEach(code => {
+        const stock = allStocksList[code];
+        const quote = latestQuotes[code];
+        if (!quote) return;
+        
+        const diff = quote.price - quote.prev;
+        const pct = (diff / quote.prev) * 100;
+
+        (stock.sectors || []).forEach(sec => {
+          if (!sectorStats[sec]) {
+            sectorStats[sec] = { sumPct: 0, count: 0, up: 0, down: 0 };
+          }
+          sectorStats[sec].sumPct += pct;
+          sectorStats[sec].count++;
+          if (diff > 0.0001) sectorStats[sec].up++;
+          else if (diff < -0.0001) sectorStats[sec].down++;
+        });
+      });
+
+      Object.keys(sectorStats).forEach(sec => {
+        sectorStats[sec].avgPct = sectorStats[sec].sumPct / sectorStats[sec].count;
+      });
+    }
+
+    // 渲染導航列 (依照類股平均漲幅由大到小排序)
+    function renderSectors() {
+      const bar = document.getElementById('sector-bar');
+      bar.innerHTML = `<button class="tab-btn ${currentSector === 'RANKING' ? 'active' : ''}" onclick="setSector('RANKING')">👑 強弱排行</button>`;
+      
+      const sortedSectors = Object.keys(sectorStats).sort((a, b) => sectorStats[b].avgPct - sectorStats[a].avgPct);
+      
+      // 如果還沒抓到報價，就先用原著名單的分類隨機排
+      if (sortedSectors.length === 0) {
+        const tempSectors = new Set();
+        Object.values(allStocksList).forEach(s => {
+          if (s.sectors) s.sectors.forEach(sec => tempSectors.add(sec));
+        });
+        tempSectors.forEach(sec => {
+          bar.innerHTML += `<button class="tab-btn ${currentSector === sec ? 'active' : ''}" onclick="setSector('${sec}')">${sec}</button>`;
+        });
+        return;
       }
 
-      renderCards();
+      // 依強弱排序渲染標籤 (加上平均漲幅)
+      sortedSectors.forEach(sec => {
+        const avg = sectorStats[sec].avgPct;
+        const sign = avg > 0 ? '+' : '';
+        const btnText = `${sec} ${sign}${avg.toFixed(1)}%`;
+        bar.innerHTML += `<button class="tab-btn ${currentSector === sec ? 'active' : ''}" onclick="setSector('${sec}')">${btnText}</button>`;
+      });
     }
 
     function renderCards() {
       const container = document.getElementById('stock-container');
       container.innerHTML = '';
 
-      let targetCodes = Object.keys(allStocksList);
-      if (currentSector !== 'ALL') {
-        targetCodes = targetCodes.filter(code => (allStocksList[code].sectors || []).includes(currentSector));
+      if (currentSector === 'RANKING') {
+        renderRankingBoard(container);
+      } else {
+        renderStockList(container);
+      }
+    }
+
+    // 【模式 1：渲染類股強弱看板】
+    function renderRankingBoard(container) {
+      document.querySelector('.header h1').innerText = "🏆 類股強弱榜";
+      
+      const sortedSectors = Object.keys(sectorStats).sort((a, b) => sectorStats[b].avgPct - sectorStats[a].avgPct);
+      
+      if (sortedSectors.length === 0) {
+        document.getElementById('sector-stat').innerHTML = `等待數據...`;
+        document.getElementById('sector-adv-dec').innerHTML = `-`;
+        return;
       }
 
-      // 依漲跌幅由大到小排序
+      let totalUp = 0, totalDown = 0;
+
+      sortedSectors.forEach(sec => {
+        const stat = sectorStats[sec];
+        totalUp += stat.up;
+        totalDown += stat.down;
+        
+        let stateClass = 'equal';
+        let sign = '';
+        if (stat.avgPct > 0.01) { stateClass = 'up'; sign = '+'; }
+        else if (stat.avgPct < -0.01) { stateClass = 'down'; }
+
+        const card = document.createElement('div');
+        card.className = `card sector-card border-${stateClass}`;
+        card.onclick = () => setSector(sec); // 點擊直接進入該類股
+        
+        card.innerHTML = `
+          <div>
+            <div class="s-name">${sec}</div>
+            <div class="s-stat">漲 ${stat.up} | 跌 ${stat.down}</div>
+          </div>
+          <div class="s-pct ${stateClass}">${sign}${stat.avgPct.toFixed(2)}%</div>
+        `;
+        container.appendChild(card);
+      });
+
+      document.getElementById('sector-stat').innerHTML = `共 <strong>${sortedSectors.length}</strong> 個強弱族群`;
+      document.getElementById('sector-adv-dec').innerHTML = `總計 <span style="color:var(--up-color);">▲ ${totalUp}</span> / <span style="color:var(--down-color);">▼ ${totalDown}</span>`;
+    }
+
+    // 【模式 2：渲染單一類股的個股清單】
+    function renderStockList(container) {
+      document.querySelector('.header h1').innerText = `🔥 ${currentSector}`;
+
+      let targetCodes = Object.keys(allStocksList).filter(code => (allStocksList[code].sectors || []).includes(currentSector));
+
       targetCodes.sort((a, b) => {
         const qA = latestQuotes[a];
         const qB = latestQuotes[b];
@@ -248,8 +326,7 @@
         return pctB - pctA;
       });
 
-      let upCount = 0;
-      let downCount = 0;
+      let upCount = 0, downCount = 0;
 
       targetCodes.forEach(code => {
         const stock = allStocksList[code];
@@ -259,28 +336,18 @@
         if (quote) {
           const diff = quote.price - quote.prev;
           const pct = ((diff / quote.prev) * 100).toFixed(2);
+          let stateClass = 'equal', sign = '';
           
-          let stateClass = 'equal';
-          let sign = '';
-          
-          if (diff > 0.0001) { 
-            stateClass = 'up'; 
-            sign = '+'; 
-            upCount++;
-          } else if (diff < -0.0001) { 
-            stateClass = 'down'; 
-            downCount++;
-          }
+          if (diff > 0.0001) { stateClass = 'up'; sign = '+'; upCount++; }
+          else if (diff < -0.0001) { stateClass = 'down'; downCount++; }
 
           card.className = `card ${stateClass}`;
-          
-          // 判斷是否為整數或小數以優化顯示
           const displayPrice = quote.price % 1 === 0 ? quote.price : quote.price.toFixed(2);
 
           card.innerHTML = `
             <div class="card-top">
               <div class="name-box">
-                <span class="name" title="${stock.name}">${stock.name || code}</span>
+                <span class="name">${stock.name || code}</span>
                 <span class="symbol">${code}</span>
               </div>
             </div>
@@ -290,29 +357,19 @@
             </div>
           `;
         } else {
-          // 抓不到資料或還在讀取
           card.className = 'card equal pulse';
           card.innerHTML = `
             <div class="card-top">
-              <div class="name-box">
-                <span class="name">${stock.name || code}</span>
-                <span class="symbol">${code}</span>
-              </div>
+              <div class="name-box"><span class="name">${stock.name || code}</span><span class="symbol">${code}</span></div>
             </div>
-            <div class="card-bottom">
-              <span class="price">--</span>
-              <span class="change-pill">讀取中</span>
-            </div>
+            <div class="card-bottom"><span class="price">--</span><span class="change-pill">讀取中</span></div>
           `;
         }
         container.appendChild(card);
       });
 
-      document.getElementById('sector-stat').innerHTML = `總計 <strong>${targetCodes.length}</strong> 檔`;
-      document.getElementById('sector-adv-dec').innerHTML = `
-        <span style="color:var(--up-color); font-weight:700;">▲ ${upCount}</span> &nbsp;|&nbsp; 
-        <span style="color:var(--down-color); font-weight:700;">▼ ${downCount}</span>
-      `;
+      document.getElementById('sector-stat').innerHTML = `該族群共 <strong>${targetCodes.length}</strong> 檔`;
+      document.getElementById('sector-adv-dec').innerHTML = `<span style="color:var(--up-color);">▲ ${upCount}</span> | <span style="color:var(--down-color);">▼ ${downCount}</span>`;
     }
 
     init();
