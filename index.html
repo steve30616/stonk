@@ -28,9 +28,7 @@
     
     .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 999; backdrop-filter: blur(3px); }
     .modal-overlay.active { display: flex; }
-    #paramPanel { background: var(--card-bg); border-radius: 16px; padding: 20px; width: 90%; max-width: 350px; max-height: 85vh; overflow-y: auto; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.8); animation: zoomIn 0.2s ease-out; }
-    @keyframes zoomIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-    
+    #paramPanel { background: var(--card-bg); border-radius: 16px; padding: 20px; width: 90%; max-width: 350px; max-height: 85vh; overflow-y: auto; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
     .param-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid var(--border); padding-bottom: 12px;}
     .param-title { font-size: 15px; font-weight: 700; color: #fff; }
     .param-grid { display: grid; grid-template-columns: 1fr; gap: 14px; margin-bottom: 14px; }
@@ -46,7 +44,7 @@
     .status-summary { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-sub); margin-bottom: 8px; padding: 0 2px; }
     #errBanner { display: none; background: rgba(255, 59, 48, 0.15); border: 1px solid var(--up); color: #ff8a80; padding: 8px 12px; border-radius: 8px; font-size: 12px; margin-bottom: 12px; line-height: 1.4; word-break: break-all; }
     
-    .cat-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; margin-bottom: 12px; overflow: hidden; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 4px 12px rgba(0,0,0,0.25); }
+    .cat-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; margin-bottom: 12px; overflow: hidden; transition: all 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.25); }
     .cat-card.expanded { border-color: var(--border-focus); }
     .cat-header { padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
     .cat-left { display: flex; align-items: center; gap: 12px; }
@@ -83,9 +81,9 @@
     .c-down { color: var(--down); }
     .c-flat { color: var(--flat); }
     
-    .stock-price { font-weight: 700; font-size: 14px; padding: 2px 6px; border-radius: 4px; display: inline-block; transition: all 0.2s; }
-    .limit-up-solid { background-color: var(--up) !important; color: #ffffff !important; font-weight: 900 !important; box-shadow: 0 0 10px rgba(255, 59, 48, 0.6); border-radius: 4px; }
-    .limit-down-solid { background-color: var(--down) !important; color: #ffffff !important; font-weight: 900 !important; box-shadow: 0 0 10px rgba(52, 199, 89, 0.6); border-radius: 4px; }
+    .stock-price { font-weight: 700; font-size: 14px; padding: 2px 6px; border-radius: 4px; display: inline-block; }
+    .limit-up-solid { background-color: var(--up) !important; color: #ffffff !important; font-weight: 900 !important; }
+    .limit-down-solid { background-color: var(--down) !important; color: #ffffff !important; font-weight: 900 !important; }
     .stock-change-box { display: flex; flex-direction: column; align-items: flex-end; }
     .stock-change-pct { font-size: 14px; font-weight: 700; line-height: 1.2; }
     .stock-change-amt { font-size: 11px; font-weight: 500; opacity: 0.9; margin-top: 1px; }
@@ -143,20 +141,15 @@
   <div class="container">
     <div id="errBanner"></div>
     <div class="status-summary">
-      <span id="updateTime">等待手動刷新...</span>
+      <span id="updateTime">初始化中...</span>
       <span id="totalStats">-- 族群</span>
     </div>
     <div id="categoryContainer"></div>
   </div>
 
   <script>
-    // ==========================================
-    // 👇 1. 替換成你的 Firebase 資料庫網址 👇
     const FIREBASE_URL = "https://stonk-aae09-default-rtdb.asia-southeast1.firebasedatabase.app";
-
-    // 👇 2. 替換成你的 Google Cloud Function 網址 👇
     const GCF_URL = "https://tw-stock-quotes-955770872872.asia-east1.run.app";
-    // ==========================================
 
     const DEFAULT_PARAMS = {
       volThreshold: 300,
@@ -172,6 +165,12 @@
     let latestQuotes = {};
     const expandedSet = new Set();
     let isFetching = false;
+
+    function safeNum(val, fallback = 0) {
+      if (val === null || val === undefined || val === '-' || val === '') return fallback;
+      const n = parseFloat(String(val).replace(/,/g, ''));
+      return isNaN(n) ? fallback : n;
+    }
 
     function showErr(msg) {
       const el = document.getElementById('errBanner');
@@ -192,23 +191,21 @@
         ]);
 
         if (!listResp.ok) throw new Error(`Firebase 讀取失敗 HTTP ${listResp.status}`);
-
         const listData = await listResp.json();
-        let settingsData = null;
-        if (settingsResp && settingsResp.ok) settingsData = await settingsResp.json();
         
-        if (!listData || !listData.stocks) throw new Error("Firebase 內的 stock_list 是空的，請先執行 GAS 同步！");
+        if (!listData || !listData.stocks) throw new Error("Firebase stock_list 為空，請先在 Google Sheet 執行一次同步！");
         allStocksList = listData.stocks;
-        
-        if (settingsData) userSettings = { ...DEFAULT_PARAMS, ...settingsData };
+
+        if (settingsResp && settingsResp.ok) {
+          const s = await settingsResp.json();
+          if (s) userSettings = { ...DEFAULT_PARAMS, ...s };
+        }
         initParamControls(userSettings);
         
-        // 先繪製基本骨架，避免空白
         recalculateAndRender();
-        
         await fetchLiveQuotes();
       } catch (e) {
-        document.getElementById('updateTime').innerText = `連線異常`;
+        document.getElementById('updateTime').innerText = `載入異常`;
         showErr(`⚠️ 初始化錯誤: ${e.message}`);
       }
     }
@@ -245,12 +242,12 @@
 
     async function saveToCloud() {
       userSettings = {
-        volThreshold: Number(document.getElementById('sl_volThreshold').value),
-        upBreadthThreshold: Number(document.getElementById('sl_upBreadthThreshold').value),
-        downBreadthThreshold: Number(document.getElementById('sl_downBreadthThreshold').value),
-        upBonus: Number(document.getElementById('sl_upBonus').value),
-        downPenalty: Number(document.getElementById('sl_downPenalty').value),
-        minorPenalty: Number(document.getElementById('sl_minorPenalty').value)
+        volThreshold: safeNum(document.getElementById('sl_volThreshold').value, 300),
+        upBreadthThreshold: safeNum(document.getElementById('sl_upBreadthThreshold').value, 65),
+        downBreadthThreshold: safeNum(document.getElementById('sl_downBreadthThreshold').value, 60),
+        upBonus: safeNum(document.getElementById('sl_upBonus').value, 1.5),
+        downPenalty: safeNum(document.getElementById('sl_downPenalty').value, 1.5),
+        minorPenalty: safeNum(document.getElementById('sl_minorPenalty').value, 0.5)
       };
       
       try {
@@ -283,17 +280,19 @@
         return;
       }
 
-      // 分批 35 檔一組
       const chunks = [];
       for (let i = 0; i < codes.length; i += 35) {
         const sliceCodes = codes.slice(i, i + 35);
-        chunks.push(sliceCodes.map(c => `${allStocksList[c].market || 'tse'}_${c}.tw`).join('|'));
+        chunks.push(sliceCodes.map(c => {
+          const item = allStocksList[c];
+          const market = (item && item.market) ? item.market : 'tse';
+          return `${market}_${String(c).trim().toUpperCase()}.tw`;
+        }).join('|'));
       }
 
       let errorCount = 0;
       let lastErrMsg = '';
 
-      // 加入批次微延遲，避免瞬間打死 TWSE
       for (let i = 0; i < chunks.length; i++) {
         const chunk = chunks[i];
         try {
@@ -301,9 +300,12 @@
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const data = await res.json();
 
-          if (data && data.msgArray) {
+          if (data && data.msgArray && Array.isArray(data.msgArray)) {
             data.msgArray.forEach(item => {
-              const prev = parseFloat(item.y) || 0; 
+              const code = String(item.c || '').trim().toUpperCase();
+              if (!code) return;
+
+              const prev = safeNum(item.y, 0);
               let rawPrice = (item.z && item.z !== '-') ? item.z : (item.pz && item.pz !== '-') ? item.pz : null;
               
               if (!rawPrice) {
@@ -314,42 +316,33 @@
                 else rawPrice = item.y;
               }
               
-              let price = parseFloat((rawPrice || '').replace(/,/g, ''));
-              if (isNaN(price)) price = prev;
-              
-              const high = parseFloat((item.h || '').replace(/,/g, ''));
-              const low = parseFloat((item.l || '').replace(/,/g, ''));
-              if (!isNaN(high) && high > 0 && price > high) price = high;
-              if (!isNaN(low) && low > 0 && price < low) price = low;
-              
-              const vol = parseInt((item.v || '').replace(/,/g, ''), 10) || 0;
+              let price = safeNum(rawPrice, prev);
+              const vol = safeNum(item.v, 0);
 
-              if (prev > 0) {
-                const change = price - prev;
-                const changePercent = (change / prev) * 100;
-                latestQuotes[item.c] = { 
-                  price: price, 
-                  prev: prev,
-                  change: change,
-                  changePercent: changePercent,
-                  volume: vol,
-                  turnover: price * vol
-                };
-              }
+              const change = (prev > 0) ? (price - prev) : 0;
+              const changePercent = (prev > 0) ? ((change / prev) * 100) : 0;
+              
+              latestQuotes[code] = { 
+                price: price, 
+                prev: prev,
+                change: change,
+                changePercent: changePercent,
+                volume: vol,
+                turnover: price * vol
+              };
             });
           }
         } catch (e) {
           errorCount++;
           lastErrMsg = e.message;
         }
-        // 批次間隔 80ms
         if (i < chunks.length - 1) await sleep(80);
       }
 
       const now = new Date();
       if (errorCount === chunks.length) {
         document.getElementById('updateTime').innerText = `連線失敗`;
-        showErr(`⚠️ 報價伺服器無回應: ${lastErrMsg}。請確認 Google Cloud Function 是否正常運行。`);
+        showErr(`⚠️ 伺服器無回應: ${lastErrMsg}`);
       } else {
         document.getElementById('updateTime').innerText = `🕒 最後更新 ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}`;
       }
@@ -359,17 +352,20 @@
     }
 
     function recalculateAndRender() {
-      const vTh = Number(document.getElementById('sl_volThreshold').value);
-      const upBTh = Number(document.getElementById('sl_upBreadthThreshold').value);
-      const downBTh = Number(document.getElementById('sl_downBreadthThreshold').value);
-      const uBonus = Number(document.getElementById('sl_upBonus').value);
-      const dPenalty = Number(document.getElementById('sl_downPenalty').value);
-      const mPenalty = Number(document.getElementById('sl_minorPenalty').value);
+      const vTh = safeNum(document.getElementById('sl_volThreshold').value, 300);
+      const upBTh = safeNum(document.getElementById('sl_upBreadthThreshold').value, 65);
+      const downBTh = safeNum(document.getElementById('sl_downBreadthThreshold').value, 60);
+      const uBonus = safeNum(document.getElementById('sl_upBonus').value, 1.5);
+      const dPenalty = safeNum(document.getElementById('sl_downPenalty').value, 1.5);
+      const mPenalty = safeNum(document.getElementById('sl_minorPenalty').value, 0.5);
 
       const sectorMap = {};
-      Object.keys(allStocksList).forEach(code => {
-        const stock = allStocksList[code];
-        (stock.sectors || []).forEach(sec => {
+      Object.keys(allStocksList).forEach(rawCode => {
+        const code = String(rawCode).trim().toUpperCase();
+        const stock = allStocksList[rawCode];
+        const sectors = stock.sectors || ["其他"];
+        
+        sectors.forEach(sec => {
           if (!sectorMap[sec]) sectorMap[sec] = { name: sec, stocks: [] };
           
           const q = latestQuotes[code];
@@ -386,9 +382,7 @@
         });
       });
 
-      const rawCategoryData = Object.values(sectorMap);
-
-      const calculated = rawCategoryData.map(cat => {
+      const calculated = Object.values(sectorMap).map(cat => {
         let totalWeightedPct = 0, totalTurnover = 0, totalVolume = 0;
         let validCount = 0, upCount = 0, downCount = 0, activeCount = 0, missingCount = 0;
 
@@ -398,7 +392,8 @@
           totalTurnover += stk.turnover;
           if (stk.volume >= vTh) {
             activeCount++;
-            totalWeightedPct += stk.changePercent * (stk.turnover > 0 ? stk.turnover : 1);
+            const weight = stk.turnover > 0 ? stk.turnover : 1;
+            totalWeightedPct += stk.changePercent * weight;
             if (stk.change > 0) upCount++;
             if (stk.change < 0) downCount++;
           }
@@ -406,8 +401,9 @@
         });
 
         let weightedPct = totalTurnover > 0 ? (totalWeightedPct / totalTurnover) : 0;
-        let baseScore = 10 + weightedPct; 
-        let finalScore = baseScore;
+        if (isNaN(weightedPct)) weightedPct = 0;
+
+        let finalScore = 10 + weightedPct; 
 
         const upRatio = activeCount > 0 ? (upCount / activeCount) : 0;
         const downRatio = activeCount > 0 ? (downCount / activeCount) : 0;
@@ -425,6 +421,7 @@
         }
 
         finalScore = Math.max(0, Math.min(20, finalScore));
+        if (isNaN(finalScore)) finalScore = 10;
 
         return {
           name: cat.name,
@@ -458,7 +455,7 @@
         
         const scoreStr = cat.score.toFixed(1);
         const truePctStr = (cat.weightedPct > 0 ? '+' : '') + cat.weightedPct.toFixed(2) + '%';
-        const flatCount = cat.validCount - cat.upCount - cat.downCount;
+        const flatCount = Math.max(0, cat.validCount - cat.upCount - cat.downCount);
 
         let rankClass = index === 0 ? 'rank-1' : (index === 1 ? 'rank-2' : (index === 2 ? 'rank-3' : ''));
 
@@ -473,7 +470,7 @@
           if (!stk.hasData) {
             stocksListHtml += `
               <div class="stock-row">
-                <div><div class="stock-name" style="color:#ff9800;">${stk.code}</div><div class="stock-code">無即時數據</div></div>
+                <div><div class="stock-name" style="color:#ff9800;">${stk.name || stk.code}</div><div class="stock-code">${stk.code}</div></div>
                 <div class="text-r"><span class="stock-price c-flat">--</span></div>
                 <div class="stock-change-box text-r c-flat"><div class="stock-change-pct">--</div></div>
                 <div class="text-r stock-vol">-</div>
@@ -515,8 +512,7 @@
         card.className = `cat-card ${isExpanded ? 'expanded' : ''}`;
         card.setAttribute('data-name', cat.name);
         const turnoverYi = ((cat.totalTurnover || 0) / 100000).toFixed(1); 
-        
-        const warnBadge = cat.missingCount > 0 ? `<span class="tag-warn">無數據: ${cat.missingCount}</span>` : '';
+        const warnBadge = cat.missingCount > 0 ? `<span class="tag-warn">待補: ${cat.missingCount}</span>` : '';
 
         card.innerHTML = `
           <div class="cat-header" onclick="toggleCard('${cat.name}')">
