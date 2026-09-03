@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>台股類股排行榜</title>
+  <title>台股類股火力看板 (20分制)</title>
   <style>
     :root {
       --bg: #0d0f12; --card-bg: #161920; --card-inner: #1c212b;
@@ -26,7 +26,6 @@
     .btn-refresh { background: linear-gradient(135deg, #2979ff, #1565c0); border: none; color: #fff; padding: 6px 14px; border-radius: 16px; font-size: 12px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px var(--accent-glow); }
     .btn-refresh:active { transform: scale(0.95); }
     
-    /* 彈出式設定選單 (Modal) */
     .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 999; backdrop-filter: blur(3px); }
     .modal-overlay.active { display: flex; }
     #paramPanel { background: var(--card-bg); border-radius: 16px; padding: 20px; width: 90%; max-width: 350px; max-height: 85vh; overflow-y: auto; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.8); animation: zoomIn 0.2s ease-out; }
@@ -44,9 +43,9 @@
     .btn-save-cloud { flex: 1; background: #1976d2; border: none; color: white; padding: 10px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
     
     .container { padding: 14px 16px; max-width: 650px; margin: 0 auto; }
-    .status-summary { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-sub); margin-bottom: 12px; padding: 0 2px; }
+    .status-summary { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-sub); margin-bottom: 8px; padding: 0 2px; }
+    #errBanner { display: none; background: rgba(255, 59, 48, 0.15); border: 1px solid var(--up); color: #ff8a80; padding: 8px 12px; border-radius: 8px; font-size: 12px; margin-bottom: 12px; line-height: 1.4; word-break: break-all; }
     
-    /* 類股卡片 */
     .cat-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; margin-bottom: 12px; overflow: hidden; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 4px 12px rgba(0,0,0,0.25); }
     .cat-card.expanded { border-color: var(--border-focus); }
     .cat-header { padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
@@ -63,7 +62,6 @@
     .tag-warn { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: var(--warn-bg); color: var(--warn); }
     .cat-right { display: flex; align-items: center; gap: 8px; }
     
-    /* 漲跌幅標籤 */
     .pct-tag { min-width: 75px; text-align: center; padding: 6px 10px; border-radius: 8px; font-size: 16px; font-weight: 800; }
     .is-up { color: var(--up); background: var(--up-bg); border: 1px solid rgba(255, 59, 48, 0.2); }
     .is-down { color: var(--down); background: var(--down-bg); border: 1px solid rgba(52, 199, 89, 0.2); }
@@ -72,7 +70,6 @@
     .chevron { font-size: 11px; color: var(--text-muted); transition: transform 0.25s; }
     .cat-card.expanded .chevron { transform: rotate(180deg); }
     
-    /* 展開明細 */
     .stock-detail-container { display: none; background: var(--card-inner); border-top: 1px solid var(--border); padding: 10px 16px 14px 16px; }
     .cat-card.expanded .stock-detail-container { display: block; }
     .detail-head { display: grid; grid-template-columns: 1.3fr 1fr 1.2fr 0.9fr; font-size: 11px; color: var(--text-muted); padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.06); margin-bottom: 4px; }
@@ -107,7 +104,6 @@
     </div>
   </header>
 
-  <!-- 點擊背景可關閉的 Modal 選單 -->
   <div id="paramOverlay" class="modal-overlay" onclick="closeParamPanel(event)">
     <div id="paramPanel" onclick="event.stopPropagation()">
       <div class="param-title-row"><div class="param-title">⚙️ 20分制進階火力策略</div></div>
@@ -145,6 +141,7 @@
   </div>
 
   <div class="container">
+    <div id="errBanner"></div>
     <div class="status-summary">
       <span id="updateTime">等待手動刷新...</span>
       <span id="totalStats">-- 族群</span>
@@ -163,11 +160,11 @@
 
     const DEFAULT_PARAMS = {
       volThreshold: 300,
-      upBreadthThreshold: 65,      // 齊漲廣度
-      downBreadthThreshold: 60,    // 齊跌廣度
-      upBonus: 1.5,                // 齊漲加分
-      downPenalty: 1.5,            // 齊跌殺盤重扣
-      minorPenalty: 0.5            // 跌多漲少微扣
+      upBreadthThreshold: 65,
+      downBreadthThreshold: 60,
+      upBonus: 1.5,
+      downPenalty: 1.5,
+      minorPenalty: 0.5
     };
 
     let userSettings = { ...DEFAULT_PARAMS };
@@ -176,45 +173,57 @@
     const expandedSet = new Set();
     let isFetching = false;
 
+    function showErr(msg) {
+      const el = document.getElementById('errBanner');
+      if (msg) {
+        el.innerText = msg;
+        el.style.display = 'block';
+      } else {
+        el.style.display = 'none';
+      }
+    }
+
     async function init() {
       try {
+        showErr('');
         const [listResp, settingsResp] = await Promise.all([
           fetch(`${FIREBASE_URL}/stock_list.json`),
           fetch(`${FIREBASE_URL}/settings.json`).catch(() => null)
         ]);
 
+        if (!listResp.ok) throw new Error(`Firebase 讀取失敗 HTTP ${listResp.status}`);
+
         const listData = await listResp.json();
         let settingsData = null;
         if (settingsResp && settingsResp.ok) settingsData = await settingsResp.json();
         
-        if (!listData || !listData.stocks) throw new Error("Firebase 無資料");
+        if (!listData || !listData.stocks) throw new Error("Firebase 內的 stock_list 是空的，請先執行 GAS 同步！");
         allStocksList = listData.stocks;
         
         if (settingsData) userSettings = { ...DEFAULT_PARAMS, ...settingsData };
         initParamControls(userSettings);
         
+        // 先繪製基本骨架，避免空白
+        recalculateAndRender();
+        
         await fetchLiveQuotes();
       } catch (e) {
-        document.getElementById('updateTime').innerText = `連線錯誤: ${e.message}`;
+        document.getElementById('updateTime').innerText = `連線異常`;
+        showErr(`⚠️ 初始化錯誤: ${e.message}`);
       }
     }
 
     function initParamControls(p) {
       document.getElementById('sl_volThreshold').value = p.volThreshold;
       document.getElementById('lbl_volThreshold').innerText = p.volThreshold;
-      
       document.getElementById('sl_upBreadthThreshold').value = p.upBreadthThreshold;
       document.getElementById('lbl_upBreadthThreshold').innerText = p.upBreadthThreshold;
-      
       document.getElementById('sl_downBreadthThreshold').value = p.downBreadthThreshold;
       document.getElementById('lbl_downBreadthThreshold').innerText = p.downBreadthThreshold;
-      
       document.getElementById('sl_upBonus').value = p.upBonus;
       document.getElementById('lbl_upBonus').innerText = parseFloat(p.upBonus).toFixed(1);
-      
       document.getElementById('sl_downPenalty').value = p.downPenalty;
       document.getElementById('lbl_downPenalty').innerText = parseFloat(p.downPenalty).toFixed(1);
-      
       document.getElementById('sl_minorPenalty').value = p.minorPenalty;
       document.getElementById('lbl_minorPenalty').innerText = parseFloat(p.minorPenalty).toFixed(1);
     }
@@ -261,83 +270,92 @@
       fetchLiveQuotes();
     }
 
+    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
     async function fetchLiveQuotes() {
       isFetching = true;
-      document.getElementById('updateTime').innerText = "連線抓取中...";
+      showErr('');
+      document.getElementById('updateTime').innerText = "即時報價更新中...";
       
       const codes = Object.keys(allStocksList);
-      if (codes.length === 0) return;
+      if (codes.length === 0) {
+        isFetching = false;
+        return;
+      }
 
+      // 分批 35 檔一組
       const chunks = [];
-      for (let i = 0; i < codes.length; i += 40) {
-        const sliceCodes = codes.slice(i, i + 40);
+      for (let i = 0; i < codes.length; i += 35) {
+        const sliceCodes = codes.slice(i, i + 35);
         chunks.push(sliceCodes.map(c => `${allStocksList[c].market || 'tse'}_${c}.tw`).join('|'));
       }
 
-      try {
-        const promises = chunks.map(async (chunk) => {
+      let errorCount = 0;
+      let lastErrMsg = '';
+
+      // 加入批次微延遲，避免瞬間打死 TWSE
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        try {
           const res = await fetch(`${GCF_URL}?ex_ch=${encodeURIComponent(chunk)}`);
-          if (!res.ok) throw new Error(`連線代碼 ${res.status}`);
-          return res.json();
-        });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
 
-        const results = await Promise.all(promises);
-
-        results.forEach(data => {
-          if (!data || !data.msgArray) return;
-          data.msgArray.forEach(item => {
-            const prev = parseFloat(item.y) || 0; 
-            let rawPrice = (item.z && item.z !== '-') ? item.z : (item.pz && item.pz !== '-') ? item.pz : null;
-            
-            // 🛡️ 完美防呆：用 a/b 掛單判斷漲跌停與量少冷門股
-            if (!rawPrice) {
-              const bestAsk = (item.a || '').split('_')[0]; 
-              const bestBid = (item.b || '').split('_')[0]; 
+          if (data && data.msgArray) {
+            data.msgArray.forEach(item => {
+              const prev = parseFloat(item.y) || 0; 
+              let rawPrice = (item.z && item.z !== '-') ? item.z : (item.pz && item.pz !== '-') ? item.pz : null;
               
-              if (bestBid && bestBid !== '-') {
-                rawPrice = bestBid; 
-              } else if (bestAsk && bestAsk !== '-') {
-                rawPrice = bestAsk; 
-              } else {
-                rawPrice = item.y;  
+              if (!rawPrice) {
+                const bestAsk = (item.a || '').split('_')[0]; 
+                const bestBid = (item.b || '').split('_')[0]; 
+                if (bestBid && bestBid !== '-') rawPrice = bestBid;
+                else if (bestAsk && bestAsk !== '-') rawPrice = bestAsk;
+                else rawPrice = item.y;
               }
-            }
-            
-            let price = parseFloat((rawPrice || '').replace(/,/g, ''));
-            if (isNaN(price)) price = prev;
-            
-            // 🛡️ 今日高低點防護網
-            const high = parseFloat((item.h || '').replace(/,/g, ''));
-            const low = parseFloat((item.l || '').replace(/,/g, ''));
-            if (!isNaN(high) && high > 0 && price > high) price = high;
-            if (!isNaN(low) && low > 0 && price < low) price = low;
-            
-            const vol = parseInt((item.v || '').replace(/,/g, ''), 10) || 0;
+              
+              let price = parseFloat((rawPrice || '').replace(/,/g, ''));
+              if (isNaN(price)) price = prev;
+              
+              const high = parseFloat((item.h || '').replace(/,/g, ''));
+              const low = parseFloat((item.l || '').replace(/,/g, ''));
+              if (!isNaN(high) && high > 0 && price > high) price = high;
+              if (!isNaN(low) && low > 0 && price < low) price = low;
+              
+              const vol = parseInt((item.v || '').replace(/,/g, ''), 10) || 0;
 
-            if (prev > 0) {
-              const change = price - prev;
-              const changePercent = (change / prev) * 100;
-              latestQuotes[item.c] = { 
-                price: price, 
-                prev: prev,
-                change: change,
-                changePercent: changePercent,
-                volume: vol,
-                turnover: price * vol
-              };
-            }
-          });
-        });
-
-        const now = new Date();
-        document.getElementById('updateTime').innerText = `🕒 最後更新 ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}`;
-        
-        recalculateAndRender();
-      } catch (e) {
-        document.getElementById('updateTime').innerText = `抓取失敗`;
-      } finally {
-        isFetching = false;
+              if (prev > 0) {
+                const change = price - prev;
+                const changePercent = (change / prev) * 100;
+                latestQuotes[item.c] = { 
+                  price: price, 
+                  prev: prev,
+                  change: change,
+                  changePercent: changePercent,
+                  volume: vol,
+                  turnover: price * vol
+                };
+              }
+            });
+          }
+        } catch (e) {
+          errorCount++;
+          lastErrMsg = e.message;
+        }
+        // 批次間隔 80ms
+        if (i < chunks.length - 1) await sleep(80);
       }
+
+      const now = new Date();
+      if (errorCount === chunks.length) {
+        document.getElementById('updateTime').innerText = `連線失敗`;
+        showErr(`⚠️ 報價伺服器無回應: ${lastErrMsg}。請確認 Google Cloud Function 是否正常運行。`);
+      } else {
+        document.getElementById('updateTime').innerText = `🕒 最後更新 ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}`;
+      }
+      
+      recalculateAndRender();
+      isFetching = false;
     }
 
     function recalculateAndRender() {
@@ -387,7 +405,6 @@
           validCount++;
         });
 
-        // 🌟 20分制核心運算邏輯
         let weightedPct = totalTurnover > 0 ? (totalWeightedPct / totalTurnover) : 0;
         let baseScore = 10 + weightedPct; 
         let finalScore = baseScore;
@@ -396,7 +413,6 @@
         const downRatio = activeCount > 0 ? (downCount / activeCount) : 0;
         let statusTag = "平穩";
 
-        // 三段式火力判定
         if (upRatio >= (upBTh / 100)) {
           finalScore += uBonus;
           statusTag = "🔥 齊漲共振";
@@ -427,7 +443,6 @@
         };
       });
 
-      // 依 20分制 總分排行 (由高到低)
       calculated.sort((a, b) => b.score - a.score);
       renderCards(calculated);
     }
@@ -438,14 +453,11 @@
       container.innerHTML = '';
 
       categories.forEach((cat, index) => {
-        // 取得顏色狀態與文字字串 (以實漲跌幅為顏色標準)
         const isUp = cat.weightedPct > 0.001, isDown = cat.weightedPct < -0.001;
         const colorClass = isUp ? 'is-up' : (isDown ? 'is-down' : 'is-flat');
         
         const scoreStr = cat.score.toFixed(1);
         const truePctStr = (cat.weightedPct > 0 ? '+' : '') + cat.weightedPct.toFixed(2) + '%';
-        
-        // 幾漲幾跌幾平計算 (只計算有效資料)
         const flatCount = cat.validCount - cat.upCount - cat.downCount;
 
         let rankClass = index === 0 ? 'rank-1' : (index === 1 ? 'rank-2' : (index === 2 ? 'rank-3' : ''));
