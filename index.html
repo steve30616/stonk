@@ -23,8 +23,9 @@
     .brand-dot { width: 8px; height: 8px; border-radius: 50%; background: #34c759; box-shadow: 0 0 8px #34c759; }
     .header-actions { display: flex; align-items: center; gap: 8px; }
     .btn-icon { background: var(--card-inner); border: 1px solid var(--border); color: var(--text-main); padding: 6px 10px; border-radius: 16px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; }
-    .btn-refresh { background: linear-gradient(135deg, #2979ff, #1565c0); border: none; color: #fff; padding: 6px 14px; border-radius: 16px; font-size: 12px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px var(--accent-glow); }
+    .btn-refresh { background: linear-gradient(135deg, #2979ff, #1565c0); border: none; color: #fff; padding: 6px 14px; border-radius: 16px; font-size: 12px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px var(--accent-glow); transition: opacity 0.2s; }
     .btn-refresh:active { transform: scale(0.95); }
+    .btn-refresh:disabled { opacity: 0.5; cursor: not-allowed; }
     
     .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 999; backdrop-filter: blur(3px); }
     .modal-overlay.active { display: flex; }
@@ -98,7 +99,7 @@
     </div>
     <div class="header-actions">
       <button class="btn-icon" onclick="openParamPanel()">⚙️ 策略</button>
-      <button class="btn-refresh" onclick="manualRefresh()">手動刷新</button>
+      <button id="btnRefresh" class="btn-refresh" onclick="manualRefresh()">手動刷新</button>
     </div>
   </header>
 
@@ -150,6 +151,7 @@
   <script>
     const FIREBASE_URL = "https://stonk-aae09-default-rtdb.asia-southeast1.firebasedatabase.app";
     const GCF_URL = "https://tw-stock-quotes-955770872872.asia-east1.run.app";
+    const CACHE_KEY = "stonk_fast_cache_v2";
 
     const DEFAULT_PARAMS = {
       volThreshold: 300,
@@ -163,6 +165,7 @@
     let userSettings = { ...DEFAULT_PARAMS };
     let allStocksList = {};
     let latestQuotes = {};
+    let marketFixMap = {}; // 自動記憶正確的 tse / otc 屬性
     const expandedSet = new Set();
     let isFetching = false;
 
@@ -182,9 +185,34 @@
       }
     }
 
+    function loadLocalCache() {
+      try {
+        const raw = localStorage.getItem(CACHE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (parsed.marketFixMap) marketFixMap = parsed.marketFixMap;
+        // 若快取在 12 小時內，先載入墊底達成 0 秒開畫面
+        if (parsed.latestQuotes && (Date.now() - (parsed.ts || 0) < 12 * 3600 * 1000)) {
+          latestQuotes = parsed.latestQuotes;
+        }
+      } catch (e) {}
+    }
+
+    function saveLocalCache() {
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify({
+          ts: Date.now(),
+          latestQuotes: latestQuotes,
+          marketFixMap: marketFixMap
+        }));
+      } catch (e) {}
+    }
+
     async function init() {
       try {
         showErr('');
+        loadLocalCache();
+
         const [listResp, settingsResp] = await Promise.all([
           fetch(`${FIREBASE_URL}/stock_list.json`),
           fetch(`${FIREBASE_URL}/settings.json`).catch(() => null)
@@ -193,8 +221,19 @@
         if (!listResp.ok) throw new Error(`Firebase 讀取失敗 HTTP ${listResp.status}`);
         const listData = await listResp.json();
         
-        if (!listData || !listData.stocks) throw new Error("Firebase stock_list 為空，請先在 Google Sheet 執行一次同步！");
-        allStocksList = listData.stocks;
+        if (!listData || !listData.stocks) throw new Error("Firebase stock_list 為空，請先在 Google Sheet 執行同步！");
+        
+        // 正規化股票清單 Key 為大寫，並套用已修正的上市櫃屬性
+        const normalizedStocks = {};
+        Object.keys(listData.stocks).forEach(k => {
+          const cleanCode = String(k).trim().toUpperCase();
+          const item = listData.stocks[k];
+          if (marketFixMap[cleanCode]) {
+            item.market = marketFixMap[cleanCode];
+          }
+          normalizedStocks[cleanCode] = item;
+        });
+        allStocksList = normalizedStocks;
 
         if (settingsResp && settingsResp.ok) {
           const s = await settingsResp.json();
@@ -202,7 +241,10 @@
         }
         initParamControls(userSettings);
         
+        // 先用快取瞬間渲染一次畫面
         recalculateAndRender();
+        
+        // 接著在背景高速拉取最新即時報價
         await fetchLiveQuotes();
       } catch (e) {
         document.getElementById('updateTime').innerText = `載入異常`;
@@ -269,75 +311,161 @@
 
     const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+    // 單一 Chunk 請求與解析器
+    async function fetchSingleChunk(exChStr) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
+      try {
+        const res = await fetch(`${GCF_URL}?ex_ch=${encodeURIComponent(exChStr)}`, { signal: controller.signal });
+        clearTimeout(timer);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        let hitCount = 0;
+        if (data && Array.isArray(data.msgArray)) {
+          data.msgArray.forEach(item => {
+            const code = String(item.c || '').trim().toUpperCase();
+            if (!code) return;
+
+            const prev = safeNum(item.y, 0);
+            // 關鍵防呆：如果昨收價 prev <= 0，代表上市櫃 (tse/otc) 標籤錯了，跳過它讓第二輪雙向補抓處理
+            if (prev <= 0) return;
+
+            let rawPrice = (item.z && item.z !== '-') ? item.z : (item.pz && item.pz !== '-') ? item.pz : null;
+            if (!rawPrice) {
+              const bestAsk = (item.a || '').split('_')[0]; 
+              const bestBid = (item.b || '').split('_')[0]; 
+              if (bestBid && bestBid !== '-') rawPrice = bestBid;
+              else if (bestAsk && bestAsk !== '-') rawPrice = bestAsk;
+              else rawPrice = item.y;
+            }
+            
+            let price = safeNum(rawPrice, prev);
+            const high = safeNum(item.h, 0);
+            const low = safeNum(item.l, 0);
+            if (high > 0 && price > high) price = high;
+            if (low > 0 && price < low) price = low;
+
+            const vol = safeNum(item.v, 0);
+            const change = price - prev;
+            const changePercent = (change / prev) * 100;
+
+            latestQuotes[code] = { 
+              price: price, 
+              prev: prev,
+              change: change,
+              changePercent: changePercent,
+              volume: vol,
+              turnover: price * vol
+            };
+            hitCount++;
+
+            // 自動更新正確的上市櫃分類與名稱
+            if (item.ex === 'tse' || item.ex === 'otc') {
+              marketFixMap[code] = item.ex;
+              if (allStocksList[code]) allStocksList[code].market = item.ex;
+            }
+            if (item.n && allStocksList[code] && (!allStocksList[code].name || allStocksList[code].name === code)) {
+              allStocksList[code].name = item.n.trim();
+            }
+          });
+        }
+        return { ok: true, hitCount };
+      } catch (e) {
+        clearTimeout(timer);
+        return { ok: false, error: e.message };
+      }
+    }
+
     async function fetchLiveQuotes() {
       isFetching = true;
+      const btn = document.getElementById('btnRefresh');
+      if (btn) btn.disabled = true;
       showErr('');
-      document.getElementById('updateTime').innerText = "即時報價更新中...";
-      
+
       const codes = Object.keys(allStocksList);
       if (codes.length === 0) {
         isFetching = false;
+        if (btn) btn.disabled = false;
         return;
       }
 
+      // 本次刷新收到的成功代碼集合（用來精準揪出漏網之魚）
+      const fetchedThisRun = new Set();
+      const origQuotesRef = latestQuotes;
+      const runQuotes = {};
+      latestQuotes = new Proxy( origQuotesRef, {
+        set(target, prop, value) {
+          target[prop] = value;
+          runQuotes[prop] = value;
+          fetchedThisRun.add(prop);
+          return true;
+        }
+      });
+
+      // 第一輪：每包 45 檔，4 個請求同時併發
+      const CHUNK_SIZE = 45;
+      const CONCURRENCY = 4;
       const chunks = [];
-      for (let i = 0; i < codes.length; i += 35) {
-        const sliceCodes = codes.slice(i, i + 35);
+
+      for (let i = 0; i < codes.length; i += CHUNK_SIZE) {
+        const sliceCodes = codes.slice(i, i + CHUNK_SIZE);
         chunks.push(sliceCodes.map(c => {
           const item = allStocksList[c];
-          const market = (item && item.market) ? item.market : 'tse';
-          return `${market}_${String(c).trim().toUpperCase()}.tw`;
+          const market = marketFixMap[c] || ((item && item.market) ? item.market : 'tse');
+          return `${market}_${c}.tw`;
         }).join('|'));
       }
 
+      let completedChunks = 0;
       let errorCount = 0;
       let lastErrMsg = '';
 
-      for (let i = 0; i < chunks.length; i++) {
-        const chunk = chunks[i];
-        try {
-          const res = await fetch(`${GCF_URL}?ex_ch=${encodeURIComponent(chunk)}`);
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const data = await res.json();
+      for (let i = 0; i < chunks.length; i += CONCURRENCY) {
+        const batch = chunks.slice(i, i + CONCURRENCY);
+        const pct = Math.round((completedChunks / chunks.length) * 100);
+        document.getElementById('updateTime').innerText = `⚡ 極速載入中 (${pct}%)...`;
 
-          if (data && data.msgArray && Array.isArray(data.msgArray)) {
-            data.msgArray.forEach(item => {
-              const code = String(item.c || '').trim().toUpperCase();
-              if (!code) return;
-
-              const prev = safeNum(item.y, 0);
-              let rawPrice = (item.z && item.z !== '-') ? item.z : (item.pz && item.pz !== '-') ? item.pz : null;
-              
-              if (!rawPrice) {
-                const bestAsk = (item.a || '').split('_')[0]; 
-                const bestBid = (item.b || '').split('_')[0]; 
-                if (bestBid && bestBid !== '-') rawPrice = bestBid;
-                else if (bestAsk && bestAsk !== '-') rawPrice = bestAsk;
-                else rawPrice = item.y;
-              }
-              
-              let price = safeNum(rawPrice, prev);
-              const vol = safeNum(item.v, 0);
-
-              const change = (prev > 0) ? (price - prev) : 0;
-              const changePercent = (prev > 0) ? ((change / prev) * 100) : 0;
-              
-              latestQuotes[code] = { 
-                price: price, 
-                prev: prev,
-                change: change,
-                changePercent: changePercent,
-                volume: vol,
-                turnover: price * vol
-              };
-            });
+        const results = await Promise.all(batch.map(chunk => fetchSingleChunk(chunk)));
+        results.forEach(r => {
+          completedChunks++;
+          if (!r.ok) {
+            errorCount++;
+            lastErrMsg = r.error;
           }
-        } catch (e) {
-          errorCount++;
-          lastErrMsg = e.message;
-        }
-        if (i < chunks.length - 1) await sleep(80);
+        });
+
+        // 每完成一波就即時渲染畫面，不用等全部跑完
+        recalculateAndRender();
       }
+
+      // 第二輪：自動補漏機制（針對漏掉或 tse/otc 標錯的股票，同時發送 tse_ 與 otc_ 雙向查詢）
+      const missingCodes = codes.filter(c => !fetchedThisRun.has(c));
+      if (missingCodes.length > 0 && errorCount < chunks.length) {
+        document.getElementById('updateTime').innerText = `🔍 正在自動補抓 ${missingCodes.length} 檔標的...`;
+        const RETRY_CHUNK_SIZE = 22; // 每檔產生 tse + otc 兩個查詢，22 檔 = 44 個查詢參數
+        const retryChunks = [];
+
+        for (let i = 0; i < missingCodes.length; i += RETRY_CHUNK_SIZE) {
+          const slice = missingCodes.slice(i, i + RETRY_CHUNK_SIZE);
+          const dualQuery = [];
+          slice.forEach(c => {
+            dualQuery.push(`tse_${c}.tw`);
+            dualQuery.push(`otc_${c}.tw`);
+          });
+          retryChunks.push(dualQuery.join('|'));
+        }
+
+        for (let i = 0; i < retryChunks.length; i += 3) {
+          const batch = retryChunks.slice(i, i + 3);
+          await Promise.all(batch.map(chunk => fetchSingleChunk(chunk)));
+          recalculateAndRender();
+        }
+      }
+
+      // 解除 Proxy 並寫入快取
+      latestQuotes = origQuotesRef;
+      saveLocalCache();
 
       const now = new Date();
       if (errorCount === chunks.length) {
@@ -349,6 +477,7 @@
       
       recalculateAndRender();
       isFetching = false;
+      if (btn) btn.disabled = false;
     }
 
     function recalculateAndRender() {
@@ -360,9 +489,8 @@
       const mPenalty = safeNum(document.getElementById('sl_minorPenalty').value, 0.5);
 
       const sectorMap = {};
-      Object.keys(allStocksList).forEach(rawCode => {
-        const code = String(rawCode).trim().toUpperCase();
-        const stock = allStocksList[rawCode];
+      Object.keys(allStocksList).forEach(code => {
+        const stock = allStocksList[code];
         const sectors = stock.sectors || ["其他"];
         
         sectors.forEach(sec => {
